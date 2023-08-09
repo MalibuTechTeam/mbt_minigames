@@ -33,6 +33,22 @@ document.addEventListener("DOMContentLoaded", (event) => {
     }
   }
 
+  function playHoverSound() {
+    const hoverSound = document.getElementById("hoverSound");
+    hoverSound.play()
+    .catch(error => {
+      console.error("Audio play error:", error);
+    });
+  }
+
+  function playErrorSound() {
+    const errorSound = document.getElementById("errorSound");
+    errorSound.play()
+    .catch(error => {
+      console.error("Audio play error:", error);
+    });
+  }
+
   function fillWantedGrid(element) {
     const interval = 30; // Delay in milliseconds
 
@@ -115,6 +131,10 @@ document.addEventListener("DOMContentLoaded", (event) => {
         console.log("Clicked! " + gridItem.innerText);
         gridItem.style.backgroundColor = "#03a062";
       });
+
+      gridItem.addEventListener("mouseenter", () => {
+        playHoverSound(); // Call a function to play the hover sound
+      });
     });
   
     // Fill the remaining grid items with random values
@@ -125,7 +145,24 @@ document.addEventListener("DOMContentLoaded", (event) => {
   
       gridItem.addEventListener("click", () => {
         console.log("Clicked! " + gridItem.innerText);
-        gridItem.style.backgroundColor = "#03a062";
+        const originalColor = gridItem.style.backgroundColor;
+        const flashColor = "#a81515"; // The color to flash
+    
+        gridItem.style.backgroundColor = flashColor;
+
+        setTimeout(() => {
+          gridItem.style.backgroundColor = originalColor;
+          setTimeout(() => {
+            gridItem.style.backgroundColor = flashColor;
+            // isFlashing = false; // Reset the flashing flag
+          }, 100); // Adjust the delay time to control the flashing speed
+        }, 200);
+
+        playErrorSound(); // Call a function to play the error sound
+      });
+
+      gridItem.addEventListener("mouseenter", () => {
+        playHoverSound(); // Call a function to play the hover sound
       });
     });
   }
