@@ -1,3 +1,5 @@
+// import { PowerGlitch } from 'powerglitch'
+
 document.addEventListener("DOMContentLoaded", (event) => {
   console.log("DOM fully loaded and parsed");
 
@@ -35,22 +37,20 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
   function playHoverSound() {
     const hoverSound = document.getElementById("hoverSound");
-    hoverSound.play()
-    .catch(error => {
+    hoverSound.play().catch((error) => {
       console.error("Audio play error:", error);
     });
   }
 
   function playErrorSound() {
     const errorSound = document.getElementById("errorSound");
-    errorSound.play()
-    .catch(error => {
+    errorSound.play().catch((error) => {
       console.error("Audio play error:", error);
     });
   }
 
   function fillWantedGrid(element) {
-    const interval = 30; // Delay in milliseconds
+    const interval = 20; // Delay in milliseconds
 
     async function addValueWithDelay(index) {
       if (index < chosenItems.length) {
@@ -106,64 +106,108 @@ document.addEventListener("DOMContentLoaded", (event) => {
     }, interval);
   }
 
+  function flashGridItem(
+    gridItem,
+    flashColor,
+    flashDuration,
+    delayBetweenFlashes
+  ) {
+    const originalColor = gridItem.style.backgroundColor;
+
+    gridItem.style.backgroundColor = flashColor;
+
+    setTimeout(() => {
+      gridItem.style.backgroundColor = originalColor;
+      setTimeout(() => {
+        gridItem.style.backgroundColor = flashColor;
+      }, delayBetweenFlashes);
+    }, flashDuration);
+  }
+
   function fillGrid(gridItems, chosenItems) {
     console.log("fillGrid");
     console.log(chosenItems);
-  
+
     const remainingGridItems = [...gridItems]; // Create a copy of gridItems
-  
+
     // Shuffle the chosenItems array randomly
     const shuffledChosenItems = chosenItems.slice();
     for (let i = shuffledChosenItems.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [shuffledChosenItems[i], shuffledChosenItems[j]] = [shuffledChosenItems[j], shuffledChosenItems[i]];
+      [shuffledChosenItems[i], shuffledChosenItems[j]] = [
+        shuffledChosenItems[j],
+        shuffledChosenItems[i],
+      ];
     }
-  
+
     // Distribute shuffled chosen items randomly across grid items
     shuffledChosenItems.forEach((chosenValue) => {
-      const randomGridIndex = Math.floor(Math.random() * remainingGridItems.length);
+      const randomGridIndex = Math.floor(
+        Math.random() * remainingGridItems.length
+      );
       const gridItem = remainingGridItems.splice(randomGridIndex, 1)[0];
-      
+
       applyCharacterFillingEffect(gridItem, chosenValue);
       gridItem.innerText = chosenValue;
-  
+
       gridItem.addEventListener("click", () => {
         console.log("Clicked! " + gridItem.innerText);
-        gridItem.style.backgroundColor = "#03a062";
+
+        // Check if the clicked item is the first one in chosenItems
+        if (gridItem.innerText === chosenItems[0]) {
+          // Remove the first item from chosenItems
+          chosenItems.shift();
+          console.log("Correct! " + chosenItems);
+          gridItem.style.backgroundColor = "#03a062";
+          // If chosenItems is empty, the user has won
+          if (chosenItems.length === 0) {
+            console.log("You won!");
+          }
+          
+        } else {
+          console.log("You lost!");
+          let flashColor = "#a81515"; // The color to flash
+          let flashDuration = 200; // Duration of each flash in milliseconds
+          let delayBetweenFlashes = 100; // Delay between consecutive flashes in milliseconds
+
+          flashGridItem(
+            gridItem,
+            flashColor,
+            flashDuration,
+            delayBetweenFlashes
+          );
+          playErrorSound(); // Call a function to play the error sound
+        }
       });
 
       gridItem.addEventListener("mouseenter", () => {
         playHoverSound(); // Call a function to play the hover sound
       });
     });
-  
+
     // Fill the remaining grid items with random values
     remainingGridItems.forEach((gridItem) => {
-      const randomValue = generateRandomAlphanumeric(); // Assuming you have this function
+      let randomValue = generateRandomAlphanumeric(); // Assuming you have this function
       applyCharacterFillingEffect(gridItem, randomValue);
       gridItem.innerText = randomValue;
-  
+
       gridItem.addEventListener("click", () => {
         console.log("Clicked! " + gridItem.innerText);
-        const originalColor = gridItem.style.backgroundColor;
-        const flashColor = "#a81515"; // The color to flash
-    
-        gridItem.style.backgroundColor = flashColor;
+        let flashColor = "#a81515"; // The color to flash
+        let flashDuration = 200; // Duration of each flash in milliseconds
+        let delayBetweenFlashes = 100; // Delay between consecutive flashes in milliseconds
 
-        setTimeout(() => {
-          gridItem.style.backgroundColor = originalColor;
-          setTimeout(() => {
-            gridItem.style.backgroundColor = flashColor;
-            // isFlashing = false; // Reset the flashing flag
-          }, 100); // Adjust the delay time to control the flashing speed
-        }, 200);
-
+        flashGridItem(gridItem, flashColor, flashDuration, delayBetweenFlashes);
         playErrorSound(); // Call a function to play the error sound
+        console.log("You lost!");
+
       });
 
       gridItem.addEventListener("mouseenter", () => {
         playHoverSound(); // Call a function to play the hover sound
       });
     });
+
+    PowerGlitch.glitch(".glitch");
   }
 });
