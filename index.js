@@ -15,8 +15,26 @@ document.addEventListener("DOMContentLoaded", (event) => {
   fillWantedGrid(sidebarDiv);
   fillGrid(gridItems, chosenItems);
 
+  
+  function createAccessText(isGranted) {
+    let container = document.getElementById('access-mess');
+    let accessText = document.createElement('div');
+    accessText.classList.add('access-granted');
+  
+    if (isGranted) {
+      accessText.textContent = 'ACCESS  GRANTED';
+    } else {
+      accessText.textContent = 'ACCESS  DENIED';
+      accessText.classList.add('access-denied');
+    }
+  
+    container.appendChild(accessText);
+  
+    accessText.style.animation = 'slideIn 1.5s forwards'; // Apply the animation
+  }
+  
   function generateRandomHex() {
-    const letters = "0123456789ABCDEF";
+    let letters = "0123456789ABCDEF";
     return letters[Math.floor(Math.random() * 16)];
   }
 
@@ -36,29 +54,29 @@ document.addEventListener("DOMContentLoaded", (event) => {
   }
 
   function playHoverSound() {
-    const hoverSound = document.getElementById("hoverSound");
+    let hoverSound = document.getElementById("hoverSound");
     hoverSound.play().catch((error) => {
       console.error("Audio play error:", error);
     });
   }
 
   function playErrorSound() {
-    const errorSound = document.getElementById("errorSound");
+    let errorSound = document.getElementById("errorSound");
     errorSound.play().catch((error) => {
       console.error("Audio play error:", error);
     });
   }
 
   function fillWantedGrid(element) {
-    const interval = 20; // Delay in milliseconds
+    let interval = 20; // Delay in milliseconds
 
     async function addValueWithDelay(index) {
       if (index < chosenItems.length) {
-        const item = chosenItems[index];
+        let item = chosenItems[index];
 
         console.log("item: " + item);
 
-        const sidebarText = document.createElement("div");
+        let sidebarText = document.createElement("div");
         sidebarText.className = "sidebar-text";
         sidebarText.textContent = item;
         element.appendChild(sidebarText);
@@ -83,6 +101,9 @@ document.addEventListener("DOMContentLoaded", (event) => {
       } else {
         console.log("Done!");
         console.log(chosenItems);
+        // setTimeout(() => {
+        //   createAccessText(false);
+        // }, 2000);
       }
     }
 
@@ -91,7 +112,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
   function applyCharacterFillingEffect(element, chosenCharacter) {
     // Every 100ms, replace the content of element with a random character from charactersArray
-    const interval = 100; // Delay in milliseconds
+    let interval = 100; // Delay in milliseconds
     let counter = 0;
     let intervalId = setInterval(() => {
       if (counter < 50) {
@@ -112,7 +133,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
     flashDuration,
     delayBetweenFlashes
   ) {
-    const originalColor = gridItem.style.backgroundColor;
+    let originalColor = gridItem.style.backgroundColor;
 
     gridItem.style.backgroundColor = flashColor;
 
@@ -128,12 +149,12 @@ document.addEventListener("DOMContentLoaded", (event) => {
     console.log("fillGrid");
     console.log(chosenItems);
 
-    const remainingGridItems = [...gridItems]; // Create a copy of gridItems
+    let remainingGridItems = [...gridItems]; // Create a copy of gridItems
 
     // Shuffle the chosenItems array randomly
-    const shuffledChosenItems = chosenItems.slice();
+    let shuffledChosenItems = chosenItems.slice();
     for (let i = shuffledChosenItems.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      let j = Math.floor(Math.random() * (i + 1));
       [shuffledChosenItems[i], shuffledChosenItems[j]] = [
         shuffledChosenItems[j],
         shuffledChosenItems[i],
@@ -142,10 +163,10 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
     // Distribute shuffled chosen items randomly across grid items
     shuffledChosenItems.forEach((chosenValue) => {
-      const randomGridIndex = Math.floor(
+      let randomGridIndex = Math.floor(
         Math.random() * remainingGridItems.length
       );
-      const gridItem = remainingGridItems.splice(randomGridIndex, 1)[0];
+      let gridItem = remainingGridItems.splice(randomGridIndex, 1)[0];
 
       applyCharacterFillingEffect(gridItem, chosenValue);
       gridItem.innerText = chosenValue;
@@ -210,4 +231,6 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
     PowerGlitch.glitch(".glitch");
   }
+
+  
 });
