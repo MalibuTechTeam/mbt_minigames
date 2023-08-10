@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
   const gridItems = document.querySelectorAll(".grid-item");
   const sidebarDiv = document.querySelector(".sidebar");
+  const minigameTime = 30;
   const charactersArray =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()_-+=<>?/:;";
   let chosenItems = [];
@@ -15,7 +16,20 @@ document.addEventListener("DOMContentLoaded", (event) => {
   fillWantedGrid(sidebarDiv);
   fillGrid(gridItems, chosenItems);
 
+  function startTimerAndPerformAction(seconds, action) {
+    let time = seconds;
   
+    let timer = setInterval(() => {
+      time--;
+      console.log(time); // You can replace this with any relevant UI update
+      
+      if (time <= 0) {
+        clearInterval(timer);
+        action(); // Perform the action when the timer reaches zero
+      }
+    }, 1000);
+  }
+
   function createAccessText(isGranted) {
     let container = document.getElementById('access-mess');
     let accessText = document.createElement('div');
@@ -101,6 +115,12 @@ document.addEventListener("DOMContentLoaded", (event) => {
       } else {
         console.log("Done!");
         console.log(chosenItems);
+
+        startTimerAndPerformAction(minigameTime, () => {
+          console.log("Time's up! Performing the action."); // Replace this with your desired action
+          createAccessText(false);
+        });
+
         // setTimeout(() => {
         //   createAccessText(false);
         // }, 2000);
@@ -115,7 +135,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
     let interval = 100; // Delay in milliseconds
     let counter = 0;
     let intervalId = setInterval(() => {
-      if (counter < 50) {
+      if (counter < 35) {
         element.innerText =
           charactersArray[Math.floor(Math.random() * charactersArray.length)] +
           charactersArray[Math.floor(Math.random() * charactersArray.length)];
