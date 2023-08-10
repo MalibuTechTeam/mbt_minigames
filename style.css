@@ -48,6 +48,18 @@ body {
   text-align: center;
   margin-bottom: 20px;
   color: #fff;
+
+}
+
+.shell {
+  display: flex;
+  font-family: 'Hack';
+  font-size: 19px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 20px;
+  color: #fff;
+
 }
 
 .grid-container {
