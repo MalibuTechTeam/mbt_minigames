@@ -7,39 +7,9 @@ body {
   min-height: 100vh;
   background-color: #242121;
   user-select: none;
-  font-family: 'VT323', monospace;
+  font-family: "VT323", monospace;
   flex-direction: column;
 }
-
-@keyframes fade-in {
-  to {
-    opacity: 1;
-  }
-}
-
-.animate-color-change {
-  transition: background-color 0.5s ease;
-}
-
-
-@keyframes glow {
-  from {
-    text-shadow: 0 0 10px rgba(0, 255, 255, 0.7), 0 0 20px rgba(0, 255, 255, 0.5), 0 0 30px rgba(0, 255, 255, 0.3);
-  }
-  to {
-    text-shadow: 0 0 15px rgba(0, 255, 255, 1), 0 0 30px rgba(0, 255, 255, 0.7), 0 0 45px rgba(0, 255, 255, 0.5);
-  }
-}
-
-@keyframes glow-red {
-  from {
-    text-shadow: 0 0 10px rgba(255, 0, 0, 0.7), 0 0 20px rgba(255, 0, 0, 0.5), 0 0 30px rgba(255, 0, 0, 0.3);
-  }
-  to {
-    text-shadow: 0 0 15px rgba(255, 0, 0, 1), 0 0 30px rgba(255, 0, 0, 0.7), 0 0 45px rgba(255, 0, 0, 0.5);
-  }
-}
-
 
 .instruction {
   display: flex;
@@ -48,18 +18,16 @@ body {
   text-align: center;
   margin-bottom: 20px;
   color: #fff;
-
 }
 
 .shell {
   display: flex;
-  font-family: 'Hack';
+  font-family: "Hack";
   font-size: 19px;
   font-weight: bold;
   text-align: center;
   margin-bottom: 20px;
   color: #fff;
-
 }
 
 .grid-container {
@@ -104,11 +72,12 @@ body {
 .sidebar-text {
   margin: 15px 0;
   text-align: center;
-  opacity: 0; /* Set initial opacity to 0 for animation */
-  animation: fade-in 1s forwards, glow-red 2s infinite alternate; /* Apply animation to new values */
+  opacity: 0;
+  animation: fade-in 1s forwards, glow-red 2s infinite alternate;
   font-weight: bold;
-  color: #ff0000; /* Red color */
-  text-shadow: 0 0 10px rgba(255, 0, 0, 0.7), 0 0 20px rgba(255, 0, 0, 0.5), 0 0 30px rgba(255, 0, 0, 0.3); /* Red shadows */
+  color: #ff0000;
+  text-shadow: 0 0 10px rgba(255, 0, 0, 0.7), 0 0 20px rgba(255, 0, 0, 0.5),
+    0 0 30px rgba(255, 0, 0, 0.3);
   font-size: 1.4rem;
 }
 
@@ -117,47 +86,13 @@ body {
   align-items: center;
 }
 
-@media screen and (max-width: 768px) {
-  .grid-container {
-    max-width: 400px;
-  }
-
-  .sidebar {
-    margin-left: 10px;
-    min-height: 200px;
-  }
-
-  .instruction {
-    font-size: 20px;
-  }
-}
-
-@media screen and (max-width: 480px) {
-  .grid-container {
-    max-width: 300px;
-  }
-
-  .sidebar {
-    margin-left: 5px;
-    min-height: 100px;
-  }
-
-  .instruction {
-    font-size: 16px;
-  }
-}
-
-
-
-
 .glowing-text {
-  /* font-size: 24px; */
   font-weight: bold;
   color: #00ffff;
-  text-shadow: 0 0 10px rgba(0, 255, 255, 0.7), 0 0 20px rgba(0, 255, 255, 0.5), 0 0 30px rgba(0, 255, 255, 0.3);
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.7), 0 0 20px rgba(0, 255, 255, 0.5),
+    0 0 30px rgba(0, 255, 255, 0.3);
   animation: glow 2s infinite alternate;
 }
-
 
 #access-mess {
   display: none;
@@ -173,11 +108,43 @@ body {
   background-color: #000;
   box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
   position: relative;
-  animation: slideIn 1.5s forwards; /* Add the animation directly here */
+  animation: slideIn 1.5s forwards;
 }
 
 .access-denied {
   color: #ff0000;
   border: 2px solid #ff0000;
   box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+@keyframes fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-color-change {
+  transition: background-color 0.5s ease;
+}
+
+@keyframes glow {
+  from {
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.7),
+      0 0 20px rgba(0, 255, 255, 0.5), 0 0 30px rgba(0, 255, 255, 0.3);
+  }
+  to {
+    text-shadow: 0 0 15px rgba(0, 255, 255, 1), 0 0 30px rgba(0, 255, 255, 0.7),
+      0 0 45px rgba(0, 255, 255, 0.5);
+  }
+}
+
+@keyframes glow-red {
+  from {
+    text-shadow: 0 0 10px rgba(255, 0, 0, 0.7), 0 0 20px rgba(255, 0, 0, 0.5),
+      0 0 30px rgba(255, 0, 0, 0.3);
+  }
+  to {
+    text-shadow: 0 0 15px rgba(255, 0, 0, 1), 0 0 30px rgba(255, 0, 0, 0.7),
+      0 0 45px rgba(255, 0, 0, 0.5);
+  }
 }
