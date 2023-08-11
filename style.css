@@ -8,7 +8,7 @@ body {
   background-color: #242121;
   font-family: "VT323", monospace;
   flex-direction: column;
-  user-select: none;
+  overflow: hidden;
 }
 
 .instruction, .shell {
@@ -116,6 +116,7 @@ body {
     text-shadow: 0 0 10px rgba(0, 255, 255, 0.7),
       0 0 20px rgba(0, 255, 255, 0.5), 0 0 30px rgba(0, 255, 255, 0.3);
   }
+
   to {
     text-shadow: 0 0 15px rgba(0, 255, 255, 1), 0 0 30px rgba(0, 255, 255, 0.7),
       0 0 45px rgba(0, 255, 255, 0.5);
@@ -127,8 +128,36 @@ body {
     text-shadow: 0 0 10px rgba(255, 0, 0, 0.7), 0 0 20px rgba(255, 0, 0, 0.5),
       0 0 30px rgba(255, 0, 0, 0.3);
   }
+
   to {
     text-shadow: 0 0 15px rgba(255, 0, 0, 1), 0 0 30px rgba(255, 0, 0, 0.7),
       0 0 45px rgba(255, 0, 0, 0.5);
+  }
+}
+
+
+.sliding-notification {
+  display: block !important;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translate(-110%, -50%);
+  animation: slide 2s ease-in-out forwards;
+}
+
+@keyframes slide {
+  10% {
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  90% {
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  100% {
+    left: 0;
+    transform: translate(100vw, -50%);
   }
 }

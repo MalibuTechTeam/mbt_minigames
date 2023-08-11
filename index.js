@@ -41,8 +41,9 @@ document.addEventListener("DOMContentLoaded", (event) => {
     }
 
     container.appendChild(accessText);
+    container.classList.add("sliding-notification");
 
-    accessText.style.animation = "slideIn 1.5s forwards";
+    // accessText.style.animation = "slideIn 1.5s forwards";
   }
 
   function generateRandomHex() {
