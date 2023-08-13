@@ -3,18 +3,48 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
   const gridItems = document.querySelectorAll(".grid-item");
   const sidebarDiv = document.querySelector(".sidebar");
-  const minigameTime = 30;
+  const minigameTime = 10;
   const charactersArray =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()_-+=<>?/:;";
   let chosenItems = [];
+  let activeSessionId = null;
 
-  getWantedItems();
+  const fetchNUI = async (cbname, data) => {
+    const options = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=UTF-8",
+      },
+      body: JSON.stringify(data),
+    };
+    const resp = await fetch(`https://${GetParentResourceName()}/${cbname}`, options);
+    return await resp.json();
+  };
 
-  setTimeout(() => {
-    console.log("START!");
-    fillWantedGrid(sidebarDiv);
-    fillGrid(gridItems, chosenItems);
-  }, 150);
+  window.addEventListener("message", function (event) {
+    var data = event.data;
+    console.log(data.action);
+    if (data.action === "handleUI") {
+      handleDisplay(data);
+    }
+  });
+
+  function handleDisplay(data) {
+    let display = data.status;
+    activeSessionId = data.payload.Id;
+    console.log("activeSessionId: " + activeSessionId);
+    if (display === true) {
+      getWantedItems();
+      setTimeout(() => {
+        console.log("START!");
+        document.body.style.display = "flex";
+        // document.querySelector('.container').style.opacity = '1';        fillWantedGrid(sidebarDiv);
+        fillWantedGrid(sidebarDiv);
+        fillGrid(gridItems, chosenItems);
+      }, 150);
+    } else {
+    }
+  }
 
   function startTimerAndPerformAction(seconds, action) {
     let time = seconds;
@@ -22,6 +52,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
     let timer = setInterval(() => {
       time--;
       console.log(time);
+      document.getElementById("timer").textContent = time;
 
       if (time <= 0) {
         clearInterval(timer);
@@ -117,6 +148,8 @@ document.addEventListener("DOMContentLoaded", (event) => {
         startTimerAndPerformAction(minigameTime, () => {
           console.log("Time's up! Performing the action.");
           createAccessText(false);
+          fetchNUI("hackingEnd", {outcome: false, sessionId: activeSessionId});
+          
         });
       }
     }
@@ -194,6 +227,9 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
           if (chosenItems.length === 0) {
             console.log("You won!");
+            createAccessText(true);
+            fetchNUI("hackingEnd", {outcome: true, sessionId: activeSessionId});
+
           }
         } else {
           console.log("You lost!");
@@ -208,6 +244,8 @@ document.addEventListener("DOMContentLoaded", (event) => {
             delayBetweenFlashes
           );
           playErrorSound();
+          createAccessText(false);
+          fetchNUI("hackingEnd", {outcome: false, sessionId: activeSessionId});
         }
       });
 
@@ -234,6 +272,8 @@ document.addEventListener("DOMContentLoaded", (event) => {
         flashGridItem(gridItem, flashColor, flashDuration, delayBetweenFlashes);
         playErrorSound();
         console.log("You lost!");
+        createAccessText(false);
+        fetchNUI("hackingEnd", {outcome: false, sessionId: activeSessionId});
       });
 
       gridItem.addEventListener("mouseenter", () => {
@@ -241,6 +281,30 @@ document.addEventListener("DOMContentLoaded", (event) => {
       });
     });
 
-    PowerGlitch.glitch(".glitch");
+    PowerGlitch.glitch(".glitch", {
+      "playMode": "always",
+      "createContainers": true,
+      "hideOverflow": false,
+      "timing": {
+        "duration": 2000
+      },
+      "glitchTimeSpan": {
+        "start": 0.5,
+        "end": 0.7
+      },
+      "shake": {
+        "velocity": 15,
+        "amplitudeX": 0.05,
+        "amplitudeY": 0.05
+      },
+      "slice": {
+        "count": 6,
+        "velocity": 15,
+        "minHeight": 0.02,
+        "maxHeight": 0.15,
+        "hueRotate": true
+      },
+      "pulse": false
+    });
   }
 });
