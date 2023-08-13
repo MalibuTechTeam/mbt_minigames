@@ -9,10 +9,12 @@ document.addEventListener("DOMContentLoaded", (event) => {
   let chosenItems = [];
 
   getWantedItems();
-  console.log(chosenItems);
 
-  fillWantedGrid(sidebarDiv);
-  fillGrid(gridItems, chosenItems);
+  setTimeout(() => {
+    console.log("START!");
+    fillWantedGrid(sidebarDiv);
+    fillGrid(gridItems, chosenItems);
+  }, 150);
 
   function startTimerAndPerformAction(seconds, action) {
     let time = seconds;
@@ -178,6 +180,8 @@ document.addEventListener("DOMContentLoaded", (event) => {
       let gridItem = remainingGridItems.splice(randomGridIndex, 1)[0];
 
       applyCharacterFillingEffect(gridItem, chosenValue);
+      console.log("chosenValue: " + chosenValue);
+
       gridItem.innerText = chosenValue;
 
       gridItem.addEventListener("click", () => {
@@ -214,6 +218,10 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
     remainingGridItems.forEach((gridItem) => {
       let randomValue = generateRandomAlphanumeric();
+      console.log("randomValue: " + randomValue);
+      while (shuffledChosenItems.includes(randomValue)) {
+        randomValue = generateRandomAlphanumeric();
+      }
       applyCharacterFillingEffect(gridItem, randomValue);
       gridItem.innerText = randomValue;
 

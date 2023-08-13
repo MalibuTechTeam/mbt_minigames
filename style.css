@@ -1,3 +1,8 @@
+/* @font-face {
+  font-family: "Hack";
+  src: url();
+} */
+
 body {
   margin: 0;
   padding: 0;
@@ -9,14 +14,69 @@ body {
   font-family: "VT323", monospace;
   flex-direction: column;
   overflow: hidden;
+  background-image: url('https://i.ytimg.com/vi/94QskOaOgqA/maxresdefault.jpg');
+  background-size: cover;
 }
 
-.instruction, .shell {
+.instruction{
   font-size: 1.5rem;
   font-weight: bold;
   text-align: center;
-  margin-bottom: 20px;
   color: #fff;
+}
+.instruction{
+  margin-bottom: 20px;
+}
+
+.shell{
+  background-color: #30343f;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-direction: row-reverse;
+  padding: .2rem;
+  border-radius: 5px 5px 0 0;
+  padding: .2rem .5rem;
+  font-size: 1rem;
+  font-weight: 400;
+  text-align: center;
+  color: #fff;
+  font-family: "Hack";
+}
+
+.shell > .control{
+  display: flex;
+  gap: .3rem;
+}
+
+.shell > .placeholder{
+  width: 3.6rem;
+}
+.control{
+  width: fit-content;
+}
+
+.control span{
+  display: block;
+  border-radius: 50%;
+  width: 1rem;
+  height: 1rem;
+}
+
+.resize-control{
+  background-color: #3aea48;
+}
+
+.minimize-control{
+  background-color: #fac636;
+}
+
+.exit-control{
+  background-color: #ef4e55;
+}
+
+.shell-title{
+  margin: 0;
 }
 
 .grid-container {
@@ -72,6 +132,7 @@ body {
 .wrapper {
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .glowing-text {
@@ -160,4 +221,38 @@ body {
     left: 0;
     transform: translate(100vw, -50%);
   }
+}
+
+.container{
+  background-color: #000000AA;
+  width: fit-content;
+  width: 50vw;
+  max-width: 1600px;
+  padding-bottom: 2rem;
+  border-radius: 5px;
+}
+
+#timer{
+  color: white;
+  margin-left: 20px;
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+
+.nav{
+  background-color: #30343f;
+}
+
+.nav > ul{
+  margin: 0;
+  display: flex;
+  color: white;
+  list-style: none;
+  padding: 0;
+  margin-bottom: 20px;
+  margin-left: .5rem;
+  gap: .5rem;
+  font-size: 1.3rem;
 }
