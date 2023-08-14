@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
   const gridItems = document.querySelectorAll(".grid-item");
   const sidebarDiv = document.querySelector(".sidebar");
-  const minigameTime = 30;
+  const minigameTime = 10;
   const charactersArray =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()_-+=<>?/:;";
   let chosenItems = [];
@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
     let timer = setInterval(() => {
       time--;
       console.log(time);
+      document.getElementById("timer").textContent = time;
 
       if (time <= 0) {
         clearInterval(timer);
@@ -234,6 +235,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
         flashGridItem(gridItem, flashColor, flashDuration, delayBetweenFlashes);
         playErrorSound();
         console.log("You lost!");
+
       });
 
       gridItem.addEventListener("mouseenter", () => {
@@ -241,6 +243,30 @@ document.addEventListener("DOMContentLoaded", (event) => {
       });
     });
 
-    PowerGlitch.glitch(".glitch");
+    PowerGlitch.glitch(".glitch", {
+      "playMode": "always",
+      "createContainers": true,
+      "hideOverflow": false,
+      "timing": {
+        "duration": 2000
+      },
+      "glitchTimeSpan": {
+        "start": 0.5,
+        "end": 0.7
+      },
+      "shake": {
+        "velocity": 15,
+        "amplitudeX": 0.5,
+        "amplitudeY": 0.5
+      },
+      "slice": {
+        "count": 6,
+        "velocity": 15,
+        "minHeight": 0.02,
+        "maxHeight": 0.15,
+        "hueRotate": true
+      },
+      "pulse": false
+    });
   }
 });
