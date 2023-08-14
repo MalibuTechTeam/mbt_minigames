@@ -84,6 +84,7 @@ body {
 
 .shell-title{
   margin: 0;
+  font-family: Hack;
 }
 
 .grid-container {
@@ -251,6 +252,7 @@ body {
 
 .nav{
   background-color: #30343f;
+  font-family: Hack;
 }
 
 .nav > ul{

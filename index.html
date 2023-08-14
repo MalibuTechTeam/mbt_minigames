@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="style.css">
     <audio id="hoverSound" src="hover.ogg"></audio>
     <audio id="errorSound" src="error.ogg"></audio>
+    <audio id="successSound" src="success.ogg"></audio>
+    <audio id="failedSound" src="failed.ogg"></audio>
     <script src="index.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +19,7 @@
   </head>
 
   <body >
-    <div class="container">
+    <div class="container glitch">
       <div class="shell">
         <div class="control">
           <span class="exit-control"></span>
@@ -40,7 +42,7 @@
         </ul>
       </div>
       <div class="instruction glowing-text">Find and select the sequence in the right order</div>
-      <div class="wrapper glitch">
+      <div class="wrapper">
         <div id="access-mess"></div>
         <div class="grid-container">
           <div class="grid-item glowing-text"></div>

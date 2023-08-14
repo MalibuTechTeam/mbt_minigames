@@ -7,19 +7,61 @@ document.addEventListener("DOMContentLoaded", (event) => {
   const charactersArray =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()_-+=<>?/:;";
   let chosenItems = [];
+  let activeSessionId = null;
+  let timer = null;
 
   getWantedItems();
-
   setTimeout(() => {
     console.log("START!");
+    document.body.style.display = "flex";
+    // document.querySelector('.container').style.opacity = '1';        fillWantedGrid(sidebarDiv);
     fillWantedGrid(sidebarDiv);
     fillGrid(gridItems, chosenItems);
   }, 150);
+  
+  const fetchNUI = async (cbname, data) => {
+    const options = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=UTF-8",
+      },
+      body: JSON.stringify(data),
+    };
+    const resp = await fetch(`https://${GetParentResourceName()}/${cbname}`, options);
+    return await resp.json();
+  };
+
+  window.addEventListener("message", function (event) {
+    var data = event.data;
+    console.log(data.action);
+    if (data.action === "handleUI") {
+      handleDisplay(data);
+    }
+  });
+
+  function handleDisplay(data) {
+    let display = data.status;
+    activeSessionId = data.payload.Id;
+    console.log("activeSessionId: " + activeSessionId);
+    if (display === true) {
+      getWantedItems();
+      setTimeout(() => {
+        console.log("START!");
+        document.body.style.display = "flex";
+        // document.querySelector('.container').style.opacity = '1';        fillWantedGrid(sidebarDiv);
+        fillWantedGrid(sidebarDiv);
+        fillGrid(gridItems, chosenItems);
+      }, 150);
+    } else {
+      document.body.style.display = "none";
+
+    }
+  }
 
   function startTimerAndPerformAction(seconds, action) {
     let time = seconds;
 
-    let timer = setInterval(() => {
+    timer = setInterval(() => {
       time--;
       console.log(time);
       document.getElementById("timer").textContent = time;
@@ -83,6 +125,20 @@ document.addEventListener("DOMContentLoaded", (event) => {
     });
   }
 
+  function playSuccessSound() {
+    let successSound = document.getElementById("successSound");
+    successSound.play().catch((error) => {
+      console.error("Audio play error:", error);
+    });
+  }
+  
+  function playFailedSound() {
+    let failedSound = document.getElementById("failedSound");
+    failedSound.play().catch((error) => {
+      console.error("Audio play error:", error);
+    });
+  }
+
   function fillWantedGrid(element) {
     let interval = 20;
 
@@ -118,6 +174,8 @@ document.addEventListener("DOMContentLoaded", (event) => {
         startTimerAndPerformAction(minigameTime, () => {
           console.log("Time's up! Performing the action.");
           createAccessText(false);
+          fetchNUI("hackingEnd", {outcome: false, sessionId: activeSessionId});
+          playFailedSound();
         });
       }
     }
@@ -195,6 +253,10 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
           if (chosenItems.length === 0) {
             console.log("You won!");
+            createAccessText(true);
+            fetchNUI("hackingEnd", {outcome: true, sessionId: activeSessionId});
+            playSuccessSound();
+            clearInterval(timer);
           }
         } else {
           console.log("You lost!");
@@ -209,6 +271,10 @@ document.addEventListener("DOMContentLoaded", (event) => {
             delayBetweenFlashes
           );
           playErrorSound();
+          clearInterval(timer);
+          createAccessText(false);
+          fetchNUI("hackingEnd", {outcome: false, sessionId: activeSessionId});
+          playFailedSound();
         }
       });
 
@@ -234,8 +300,11 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
         flashGridItem(gridItem, flashColor, flashDuration, delayBetweenFlashes);
         playErrorSound();
+        clearInterval(timer);
         console.log("You lost!");
-
+        createAccessText(false);
+        fetchNUI("hackingEnd", {outcome: false, sessionId: activeSessionId});
+        playFailedSound();
       });
 
       gridItem.addEventListener("mouseenter", () => {
@@ -256,8 +325,8 @@ document.addEventListener("DOMContentLoaded", (event) => {
       },
       "shake": {
         "velocity": 15,
-        "amplitudeX": 0.5,
-        "amplitudeY": 0.5
+        "amplitudeX": 0.05,
+        "amplitudeY": 0.05
       },
       "slice": {
         "count": 6,
