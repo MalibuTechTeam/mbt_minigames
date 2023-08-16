@@ -1,28 +1,21 @@
 fx_version 'cerulean'
-game 'gta5'
+lua54        'yes'
+game         'gta5'
 
 name 'mbt_minigames'
-description 'mbtech minigames'
 author 'Malibù Tech'
 version '1.0.0'
-
-shared_scripts {
-	'shared/*.lua'
-}
+description 'A collection of mini-games integrated into the Malibù Tech\'s scripts'
 
 client_scripts {
 	'client/*.lua'
 }
 
-server_scripts {
-	'server/*.lua'
-}
-
-ui_page 'html/index.html'
+ui_page 'web/index.html'
 
 files {
-	'html/index.html',
-	'html/index.js',
-	'html/style.css',
-	'html/*.ogg'
+	'web/index.html',
+	'web/index.js',
+	'web/style.css',
+	'web/*.ogg'
 }
