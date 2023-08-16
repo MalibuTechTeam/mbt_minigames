@@ -1,13 +1,14 @@
 document.addEventListener("DOMContentLoaded", (event) => {
-  console.log("ARMED AND READY!");
-
-  const gridItems = document.querySelectorAll(".grid-item");
+  let gridItems = document.querySelectorAll(".grid-item");
   const sidebarDiv = document.querySelector(".sidebar");
-  const minigameTime = 10;
+  const gridContainer = document.querySelector('.grid-container');
+
+  let minigameTime = 10;
   const charactersArray =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()_-+=<>?/:;";
   let chosenItems = [];
   let activeSessionId = null;
+  let timer = null;
 
   const fetchNUI = async (cbname, data) => {
     const options = {
@@ -23,35 +24,53 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
   window.addEventListener("message", function (event) {
     var data = event.data;
-    console.log(data.action);
-    if (data.action === "handleUI") {
+    if (data.Action === "handleUI") {
       handleDisplay(data);
     }
   });
 
   function handleDisplay(data) {
-    let display = data.status;
-    activeSessionId = data.payload.Id;
-    console.log("activeSessionId: " + activeSessionId);
+    let display = data.Status;
     if (display === true) {
+      activeSessionId = data.Payload.Id;
+      minigameTime = data.Payload.TimeLimit;
       getWantedItems();
       setTimeout(() => {
-        console.log("START!");
         document.body.style.display = "flex";
         // document.querySelector('.container').style.opacity = '1';        fillWantedGrid(sidebarDiv);
+        createGrid();
         fillWantedGrid(sidebarDiv);
-        fillGrid(gridItems, chosenItems);
+        fillGrid(chosenItems);
       }, 150);
     } else {
+      document.body.style.display = "none";
+      document.querySelector('.sidebar').innerHTML = "";
+      document.getElementById("access-mess").innerHTML = "";
+      document.getElementById("access-mess").classList.remove("sliding-notification");
+      document.getElementById("timer").text = "?";
+
+      emptyGrid()
+      chosenItems = [];
     }
+  }
+
+  function createGrid() {
+    for (let i = 0; i < 56; i++) { // Change the number 50 to the desired number of items
+      let gridItem = document.createElement('div');
+      gridItem.classList.add('grid-item', 'glowing-text');
+      gridContainer.appendChild(gridItem);
+    }
+  }
+
+  function emptyGrid() {
+    gridContainer.innerHTML = "";
   }
 
   function startTimerAndPerformAction(seconds, action) {
     let time = seconds;
 
-    let timer = setInterval(() => {
+    timer = setInterval(() => {
       time--;
-      console.log(time);
       document.getElementById("timer").textContent = time;
 
       if (time <= 0) {
@@ -113,15 +132,25 @@ document.addEventListener("DOMContentLoaded", (event) => {
     });
   }
 
+  function playSuccessSound() {
+    let successSound = document.getElementById("successSound");
+    successSound.play().catch((error) => {
+      console.error("Audio play error:", error);
+    });
+  }
+
+  function playFailedSound() {
+    let failedSound = document.getElementById("failedSound");
+    failedSound.play().catch((error) => {
+      console.error("Audio play error:", error);
+    });
+  }
   function fillWantedGrid(element) {
     let interval = 20;
 
     async function addValueWithDelay(index) {
       if (index < chosenItems.length) {
         let item = chosenItems[index];
-
-        console.log("item: " + item);
-
         let sidebarText = document.createElement("div");
         sidebarText.className = "sidebar-text";
         sidebarText.textContent = item;
@@ -142,14 +171,10 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
         setTimeout(() => addValueWithDelay(index + 1), interval);
       } else {
-        console.log("Done!");
-        console.log(chosenItems);
-
         startTimerAndPerformAction(minigameTime, () => {
-          console.log("Time's up! Performing the action.");
           createAccessText(false);
-          fetchNUI("hackingEnd", {outcome: false, sessionId: activeSessionId});
-          
+          fetchNUI("hackingEnd", { outcome: false, sessionId: activeSessionId });
+          playFailedSound();
         });
       }
     }
@@ -181,20 +206,24 @@ document.addEventListener("DOMContentLoaded", (event) => {
   ) {
     let originalColor = gridItem.style.backgroundColor;
 
-    gridItem.style.backgroundColor = flashColor;
+    // gridItem.style.backgroundColor = flashColor;
+    gridItem.classList.add("wrong");
+
 
     setTimeout(() => {
       gridItem.style.backgroundColor = originalColor;
+      gridItem.classList.remove("wrong");
+
       setTimeout(() => {
-        gridItem.style.backgroundColor = flashColor;
+        // gridItem.classList.remove("wrong");
+        // gridItem.style.backgroundColor = flashColor;
+        gridItem.classList.add("wrong");
       }, delayBetweenFlashes);
     }, flashDuration);
   }
 
-  function fillGrid(gridItems, chosenItems) {
-    console.log("fillGrid");
-    console.log(chosenItems);
-
+  function fillGrid(chosenItems) {
+    let gridItems = document.querySelectorAll(".grid-item");
     let remainingGridItems = [...gridItems];
 
     let shuffledChosenItems = chosenItems.slice();
@@ -212,27 +241,28 @@ document.addEventListener("DOMContentLoaded", (event) => {
       );
       let gridItem = remainingGridItems.splice(randomGridIndex, 1)[0];
 
+      // gridItem.style.backgroundColor = "#393e42";
+      gridItem.classList.remove("selected");
+      gridItem.classList.remove("wrong");
+
+
       applyCharacterFillingEffect(gridItem, chosenValue);
-      console.log("chosenValue: " + chosenValue);
 
       gridItem.innerText = chosenValue;
 
       gridItem.addEventListener("click", () => {
-        console.log("Clicked! " + gridItem.innerText);
-
         if (gridItem.innerText === chosenItems[0]) {
           chosenItems.shift();
-          console.log("Correct! " + chosenItems);
-          gridItem.style.backgroundColor = "#03a062";
+          // gridItem.style.backgroundColor = "#03a062";
+          gridItem.classList.add("selected");
 
           if (chosenItems.length === 0) {
-            console.log("You won!");
             createAccessText(true);
-            fetchNUI("hackingEnd", {outcome: true, sessionId: activeSessionId});
-
+            fetchNUI("hackingEnd", { outcome: true, sessionId: activeSessionId });
+            playSuccessSound();
+            clearInterval(timer);
           }
         } else {
-          console.log("You lost!");
           let flashColor = "#a81515";
           let flashDuration = 200;
           let delayBetweenFlashes = 100;
@@ -244,8 +274,10 @@ document.addEventListener("DOMContentLoaded", (event) => {
             delayBetweenFlashes
           );
           playErrorSound();
+          clearInterval(timer);
           createAccessText(false);
-          fetchNUI("hackingEnd", {outcome: false, sessionId: activeSessionId});
+          fetchNUI("hackingEnd", { outcome: false, sessionId: activeSessionId });
+          playFailedSound();
         }
       });
 
@@ -256,24 +288,27 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
     remainingGridItems.forEach((gridItem) => {
       let randomValue = generateRandomAlphanumeric();
-      console.log("randomValue: " + randomValue);
       while (shuffledChosenItems.includes(randomValue)) {
         randomValue = generateRandomAlphanumeric();
       }
       applyCharacterFillingEffect(gridItem, randomValue);
+      // gridItem.style.backgroundColor = "#393e42";
+      gridItem.classList.remove("selected");
+      gridItem.classList.remove("wrong");
+
       gridItem.innerText = randomValue;
 
       gridItem.addEventListener("click", () => {
-        console.log("Clicked! " + gridItem.innerText);
         let flashColor = "#a81515";
         let flashDuration = 200;
         let delayBetweenFlashes = 100;
 
         flashGridItem(gridItem, flashColor, flashDuration, delayBetweenFlashes);
         playErrorSound();
-        console.log("You lost!");
+        clearInterval(timer);
         createAccessText(false);
-        fetchNUI("hackingEnd", {outcome: false, sessionId: activeSessionId});
+        fetchNUI("hackingEnd", { outcome: false, sessionId: activeSessionId });
+        playFailedSound();
       });
 
       gridItem.addEventListener("mouseenter", () => {
@@ -281,30 +316,31 @@ document.addEventListener("DOMContentLoaded", (event) => {
       });
     });
 
-    PowerGlitch.glitch(".glitch", {
-      "playMode": "always",
-      "createContainers": true,
-      "hideOverflow": false,
-      "timing": {
-        "duration": 2000
-      },
-      "glitchTimeSpan": {
-        "start": 0.5,
-        "end": 0.7
-      },
-      "shake": {
-        "velocity": 15,
-        "amplitudeX": 0.05,
-        "amplitudeY": 0.05
-      },
-      "slice": {
-        "count": 6,
-        "velocity": 15,
-        "minHeight": 0.02,
-        "maxHeight": 0.15,
-        "hueRotate": true
-      },
-      "pulse": false
-    });
+    // PowerGlitch.glitch(".glitch", {
+    //   "playMode": "always",
+    //   "createContainers": true,
+    //   "hideOverflow": false,
+    //   "timing": {
+    //     "duration": 2000
+    //   },
+    //   "glitchTimeSpan": {
+    //     "start": 0.5,
+    //     "end": 0.7
+    //   },
+    //   "shake": {
+    //     "velocity": 15,
+    //     "amplitudeX": 0.05,
+    //     "amplitudeY": 0.05
+    //   },
+    //   "slice": {
+    //     "count": 6,
+    //     "velocity": 15,
+    //     "minHeight": 0.02,
+    //     "maxHeight": 0.15,
+    //     "hueRotate": true
+    //   },
+    //   "pulse": false
+    // });
   }
 });
+
