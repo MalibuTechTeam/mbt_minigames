@@ -1,5 +1,4 @@
 local session = {}
-local bh = false
 
 local function SendNUI(data)
     SendNUIMessage(data)
@@ -113,7 +112,6 @@ local function startHackingSession(data)
 end
 
 RegisterNUICallback("hackingEnd", function (data, cb)
-    bh = false
     SetNuiFocus(false, false)
     session[data.sessionId].Response = data.outcome
 
