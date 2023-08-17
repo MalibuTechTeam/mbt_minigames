@@ -87,7 +87,7 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           DISCORD_USERNAME: "MaliBot"
           DISCORD_AVATAR:  "https://i.imgur.com/FYYQGIF.png"
-          DISCORD_EMBEDS : '[{"title": "MBT Minigames[${{ github.ref_name }} - ${{ inputs.releaseVersion || steps.date.outputs.time }}]", "description": "**Changelog:**\n\n- ${{github.event.head_commit.message}}", "color": 13975696,"footer": {"text": "© Malibú Tech", "icon_url": "https://i.imgur.com/CebOcN3.png"},"image": {"url": "https://media.discordapp.net/attachments/1036244419881476106/1141729024587075664/MBT_Minigames_Twitter_Post.png?width=1290&height=726"}}]'
+          DISCORD_EMBEDS : '[{"title": "MBT Minigames[${{ github.ref_name }} - ${{ inputs.releaseVersion || steps.date.outputs.time }}]", "description": "**Changelog:**\n\n- ${{github.event.head_commit.message}}", "color": 13975696,"footer": {"text": "© Malibú Tech", "icon_url": "https://i.imgur.com/CebOcN3.png"},"image": {"url": "https://media.discordapp.net/attachments/1036244419881476106/1141729024587075664/MBT_Minigames_Twitter_Post.png"}}]'
         uses: Ilshidur/action-discord@0.3.2
         with: 
           args: |
