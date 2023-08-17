@@ -17,5 +17,5 @@ files {
 	'web/index.html',
 	'web/index.js',
 	'web/style.css',
-	'web/*.ogg'
+	'web/assets/*.ogg'
 }

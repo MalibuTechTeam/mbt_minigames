@@ -1,22 +1,6 @@
 local session = {}
 local bh = false
 
-RegisterNUICallback("hackingEnd", function (data, cb)
-    bh = false
-    SetNuiFocus(false, false)
-    session[data.sessionId].Response = data.outcome
-
-    Wait(2000)
-
-    SendNUI({
-        Action = "handleUI",
-        Status = false,
-        Payload = {}
-    })
-
-    cb("ok")
-end)
-
 local function SendNUI(data)
     SendNUIMessage(data)
 end
@@ -33,11 +17,28 @@ local function generateSessionId()
     return randomStr
 end
 
-function startHackingSession(data)
+local function loadAnimDict(animdict)
+	while(not HasAnimDictLoaded(animdict)) do
+		RequestAnimDict(animdict)
+		Citizen.Wait(1)
+	end
+end
+
+local function loadModel(model)
+    local timeout = false
+    SetTimeout(5000, function() timeout = true end)
+
+    local hashModel = GetHashKey(model)
+    repeat
+        RequestModel(hashModel)
+        Wait(50)
+    until HasModelLoaded(hashModel) or timeout
+end
+
+local function startHackingSession(data)
     local sessionId = generateSessionId()
     session[sessionId] = {Active = true, Response = nil}
     
-
     local ped = PlayerPedId()
     local pedCoords = GetEntityCoords(ped)
     local pedRotation= GetEntityRotation(ped)
@@ -111,23 +112,21 @@ function startHackingSession(data)
     return outcome
 end
 
-function loadAnimDict(animdict)
-	while(not HasAnimDictLoaded(animdict)) do
-		RequestAnimDict(animdict)
-		Citizen.Wait(1)
-	end
-end
+RegisterNUICallback("hackingEnd", function (data, cb)
+    bh = false
+    SetNuiFocus(false, false)
+    session[data.sessionId].Response = data.outcome
 
-function loadModel(model)
-    local timeout = false
-    SetTimeout(5000, function() timeout = true end)
+    Wait(2000)
 
-    local hashModel = GetHashKey(model)
-    repeat
-        RequestModel(hashModel)
-        Wait(50)
-    until HasModelLoaded(hashModel) or timeout
-end
+    SendNUI({
+        Action = "handleUI",
+        Status = false,
+        Payload = {}
+    })
+
+    cb("ok")
+end)
 
 exports('startHackingSession', function(data)
     return startHackingSession(data)
