@@ -1,5 +1,7 @@
 local session = {}
+local bh = false
 
+---@param data table
 local function SendNUI(data)
     SendNUIMessage(data)
 end
@@ -16,6 +18,7 @@ local function generateSessionId()
     return randomStr
 end
 
+---@param animdict string
 local function loadAnimDict(animdict)
 	while(not HasAnimDictLoaded(animdict)) do
 		RequestAnimDict(animdict)
@@ -23,6 +26,7 @@ local function loadAnimDict(animdict)
 	end
 end
 
+---@param model string
 local function loadModel(model)
     local timeout = false
     SetTimeout(5000, function() timeout = true end)
@@ -34,6 +38,8 @@ local function loadModel(model)
     until HasModelLoaded(hashModel) or timeout
 end
 
+---@param data table
+---@return boolean
 local function startHackingSession(data)
     local sessionId = generateSessionId()
     session[sessionId] = {Active = true, Response = nil}
@@ -112,6 +118,7 @@ local function startHackingSession(data)
 end
 
 RegisterNUICallback("hackingEnd", function (data, cb)
+    bh = false
     SetNuiFocus(false, false)
     session[data.sessionId].Response = data.outcome
 
