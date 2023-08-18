@@ -1,5 +1,5 @@
 <div id="header" align="center">
-  <img src="https://cdn.discordapp.com/attachments/1036244419881476106/1141729024587075664/MBT_Minigames_Twitter_Post.png" width="600"/>
+  <img src="https://media.discordapp.net/attachments/1036244419881476106/1142083705192599552/Thumbnail_Youtube_MBT_Minigames.png?width=1290&height=726" width="600"/>
 </div>
 
 ##
@@ -15,6 +15,21 @@ Immerse yourself in the futuristic, slick interface that takes you right into th
 
 - Configurable time limit
 - Easy usage through export
+
+## Usage
+
+```
+    local outcome = exports.mbt_minigames:startHackingSession({
+		Time = MBT.Hacking["TimeLimit"],
+	  })
+
+    if outcome then
+      print("Hack Success!")
+    else
+      print("Hack Failed!")
+    end
+  
+```
 
 ### Media:
 - Showcase:  [Click Here](https://www.youtube.com/watch?v=TSCrxiJaWdg)
