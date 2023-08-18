@@ -58,7 +58,7 @@ jobs:
         run: |
           mkdir -p ./temp/mbt_minigames
           cp ./{README.md,fxmanifest.lua} ./temp/mbt_minigames
-          cp -r ./{client,web} ./temp/mbt_minigames
+          cp -r ./{core,web} ./temp/mbt_minigames
           cd ./temp && zip -r ../mbt_minigames.zip ./mbt_minigames
 
       - name: Create Release
