@@ -37,7 +37,6 @@ document.addEventListener("DOMContentLoaded", (event) => {
       getWantedItems();
       setTimeout(() => {
         document.body.style.display = "flex";
-        // document.querySelector('.container').style.opacity = '1';        fillWantedGrid(sidebarDiv);
         createGrid();
         fillWantedGrid(sidebarDiv);
         fillGrid(chosenItems);
@@ -55,7 +54,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
   }
 
   function createGrid() {
-    for (let i = 0; i < 56; i++) { // Change the number 50 to the desired number of items
+    for (let i = 0; i < 56; i++) {
       let gridItem = document.createElement('div');
       gridItem.classList.add('grid-item', 'glowing-text');
       gridContainer.appendChild(gridItem);
@@ -94,8 +93,6 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
     container.appendChild(accessText);
     container.classList.add("sliding-notification");
-
-    // accessText.style.animation = "slideIn 1.5s forwards";
   }
 
   function generateRandomHex() {
@@ -205,18 +202,13 @@ document.addEventListener("DOMContentLoaded", (event) => {
     delayBetweenFlashes
   ) {
     let originalColor = gridItem.style.backgroundColor;
-
-    // gridItem.style.backgroundColor = flashColor;
     gridItem.classList.add("wrong");
-
 
     setTimeout(() => {
       gridItem.style.backgroundColor = originalColor;
       gridItem.classList.remove("wrong");
 
       setTimeout(() => {
-        // gridItem.classList.remove("wrong");
-        // gridItem.style.backgroundColor = flashColor;
         gridItem.classList.add("wrong");
       }, delayBetweenFlashes);
     }, flashDuration);
@@ -241,10 +233,8 @@ document.addEventListener("DOMContentLoaded", (event) => {
       );
       let gridItem = remainingGridItems.splice(randomGridIndex, 1)[0];
 
-      // gridItem.style.backgroundColor = "#393e42";
       gridItem.classList.remove("selected");
       gridItem.classList.remove("wrong");
-
 
       applyCharacterFillingEffect(gridItem, chosenValue);
 
@@ -253,7 +243,6 @@ document.addEventListener("DOMContentLoaded", (event) => {
       gridItem.addEventListener("click", () => {
         if (gridItem.innerText === chosenItems[0]) {
           chosenItems.shift();
-          // gridItem.style.backgroundColor = "#03a062";
           gridItem.classList.add("selected");
 
           if (chosenItems.length === 0) {
@@ -292,7 +281,6 @@ document.addEventListener("DOMContentLoaded", (event) => {
         randomValue = generateRandomAlphanumeric();
       }
       applyCharacterFillingEffect(gridItem, randomValue);
-      // gridItem.style.backgroundColor = "#393e42";
       gridItem.classList.remove("selected");
       gridItem.classList.remove("wrong");
 
@@ -315,32 +303,6 @@ document.addEventListener("DOMContentLoaded", (event) => {
         playHoverSound();
       });
     });
-
-    // PowerGlitch.glitch(".glitch", {
-    //   "playMode": "always",
-    //   "createContainers": true,
-    //   "hideOverflow": false,
-    //   "timing": {
-    //     "duration": 2000
-    //   },
-    //   "glitchTimeSpan": {
-    //     "start": 0.5,
-    //     "end": 0.7
-    //   },
-    //   "shake": {
-    //     "velocity": 15,
-    //     "amplitudeX": 0.05,
-    //     "amplitudeY": 0.05
-    //   },
-    //   "slice": {
-    //     "count": 6,
-    //     "velocity": 15,
-    //     "minHeight": 0.02,
-    //     "maxHeight": 0.15,
-    //     "hueRotate": true
-    //   },
-    //   "pulse": false
-    // });
   }
 });
 
