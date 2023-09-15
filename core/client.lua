@@ -55,9 +55,13 @@ local function startHackingSession(data)
 	
 	SetFollowPedCamViewMode(4)
 	
-	local animPos = GetAnimInitialOffsetPosition(animDict, "hack_enter", pedCoords[1], pedCoords[2], pedCoords[3]+0.3, pedCoords, 0, 2) 
-	local animPos2 = GetAnimInitialOffsetPosition(animDict, "hack_loop", pedCoords[1], pedCoords[2], pedCoords[3]+0.3, pedCoords, 0, 2)
-	local animPos3 = GetAnimInitialOffsetPosition(animDict, "hack_exit", pedCoords[1], pedCoords[2], pedCoords[3]+0.3, pedCoords, 0, 2)
+	local animOffsetX = 0.0
+    	local animOffsetY = 0.0
+    	local animOffsetZ = 0.9  -- Adjust this value to prevent the player from going through the ground
+
+    	local animPos = GetAnimInitialOffsetPosition(animDict, "hack_enter", pedCoords.x + animOffsetX, pedCoords.y + animOffsetY, pedCoords.z + animOffsetZ, pedRotation.x, pedRotation.y, pedRotation.z, 2)
+    	local animPos2 = GetAnimInitialOffsetPosition(animDict, "hack_loop", pedCoords.x + animOffsetX, pedCoords.y + animOffsetY, pedCoords.z + animOffsetZ, pedRotation.x, pedRotation.y, pedRotation.z, 2)
+    	local animPos3 = GetAnimInitialOffsetPosition(animDict, "hack_exit", pedCoords.x + animOffsetX, pedCoords.y + animOffsetY, pedCoords.z + animOffsetZ, pedRotation.x, pedRotation.y, pedRotation.z, 2)
 
 	FreezeEntityPosition(ped, true)
 
