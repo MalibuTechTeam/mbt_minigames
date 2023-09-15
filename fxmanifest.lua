@@ -4,7 +4,7 @@ game         'gta5'
 
 name 'mbt_minigames'
 author 'Malibù Tech'
-version      '1.0.2'
+version      '1.0.3'
 description 'A collection of mini-games integrated into the Malibù Tech\'s scripts'
 
 client_scripts {
