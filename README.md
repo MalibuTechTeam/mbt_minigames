@@ -1,5 +1,5 @@
 <div id="header" align="center">
-  <img src="https://media.discordapp.net/attachments/1036244419881476106/1142083705192599552/Thumbnail_Youtube_MBT_Minigames.png?width=1290&height=726" width="600"/>
+  <img src="https://media.discordapp.net/attachments/1036244419881476106/1142083705192599552/Thumbnail_Youtube_MBT_Minigames.png?ex=66193356&is=6606be56&hm=69db0bfb88fbeae3846efd710f4997eaccf1a2e69fa04832eb343412bdf289a9&=&format=webp&quality=lossless&width=1290&height=726" width="600"/>
 </div>
 
 ##
@@ -35,7 +35,7 @@ Immerse yourself in the futuristic, slick interface that takes you right into th
 - Showcase:  [Click Here](https://www.youtube.com/watch?v=TSCrxiJaWdg)
 
 ## DMCA Protection Certificate
-![image](https://cdn.discordapp.com/attachments/1045063739738705940/1141766708852437072/image.png)
+![image](https://media.discordapp.net/attachments/1045063739738705940/1224145174830252203/image.png?ex=661c6d09&is=6609f809&hm=043fee0c82ffbcc2716941a0f8b2f999225e7d4d294fd0519dd87e45adb4e17a&)
 
 ##### Copyright © 2023 Malibú Tech. All rights reserved.
 
