@@ -1,0 +1,257 @@
+import React, { useEffect, useState, useRef } from 'react';
+import { useMinigameStore } from '../../store/useMinigameStore';
+import { fetchNui } from '../../utils/fetchNui';
+import { motion, AnimatePresence } from 'framer-motion';
+import './HackingGame.css';
+
+const BootSequence: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
+    const [lines, setLines] = useState<string[]>([]);
+    
+    useEffect(() => {
+        const bootMessages = [
+            "[ KERNEL ] LOADING NEURAL MODULES...",
+            "[ MEMORY ] INTEG_CHECK: 0x5F3A... PASS",
+            "[ NET ] BYPASSING FIREWALL (PORT 8080)...",
+            "[ SEC ] DECRYPTING NODES: 0x4F2A, 0xBC12...",
+            "[ SYSTEM ] INITIALIZING INTERFACE...",
+            "[ READY ] SYSTEM OVERRIDE ACTIVE."
+        ];
+
+        let currentLine = 0;
+        const addLine = () => {
+            if (currentLine < bootMessages.length) {
+                setLines(prev => [...prev, bootMessages[currentLine]]);
+                currentLine++;
+                // Random delay between lines to simulate processing
+                setTimeout(addLine, Math.random() * 300 + 100);
+            } else {
+                setTimeout(onComplete, 800);
+            }
+        };
+
+        const timer = setTimeout(addLine, 100);
+        return () => clearTimeout(timer);
+    }, [onComplete]);
+
+    return (
+        <div className="boot-sequence">
+            {lines.map((line, i) => (
+                <div key={i} className="boot-line">{line}</div>
+            ))}
+            <motion.div 
+                animate={{ opacity: [1, 0] }}
+                transition={{ duration: 0.1, repeat: Infinity }}
+                className="boot-cursor"
+            >_</motion.div>
+        </div>
+    );
+};
+
+const HackingGame: React.FC = () => {
+    const { timeLimit, sessionId, closeGame } = useMinigameStore();
+    const [timeLeft, setTimeLeft] = useState(timeLimit || 35);
+    const [gridItems, setGridItems] = useState<string[]>([]);
+    const [wantedItems, setWantedItems] = useState<string[]>([]);
+    const [foundItems, setFoundItems] = useState<string[]>([]);
+    const [isBooting, setIsBooting] = useState(true);
+    const [status, setStatus] = useState<'playing' | 'won' | 'lost'>('playing');
+    const [wrongIndex, setWrongIndex] = useState<number | null>(null);
+    const [mistakes, setMistakes] = useState(0);
+    const [displaySessionId] = useState(Math.random().toString(36).substring(7).toUpperCase());
+
+    // Sound refs using local assets - relative path for production build
+    const hoverSound = useRef<HTMLAudioElement>(new Audio('assets/hover.ogg')); 
+    const clickSound = useRef<HTMLAudioElement>(new Audio('assets/hover.ogg')); 
+    const errorSound = useRef<HTMLAudioElement>(new Audio('assets/error.ogg'));
+
+    useEffect(() => {
+        const hex = '0123456789ABCDEF';
+        const generateHex = () => Array.from({ length: 2 }, () => hex[Math.floor(Math.random() * 16)]).join('');
+        const newGrid = Array.from({ length: 64 }, generateHex);
+        const newWanted = Array.from({ length: 5 }, () => newGrid[Math.floor(Math.random() * 64)]);
+        
+        setGridItems(newGrid);
+        setWantedItems(newWanted);
+        setFoundItems([]);
+        setTimeLeft(timeLimit || 35);
+        
+        const bootTimer = setTimeout(() => setIsBooting(false), 2000);
+        return () => clearTimeout(bootTimer);
+    }, [timeLimit]);
+
+    useEffect(() => {
+        if (status === 'playing' && !isBooting && timeLeft > 0 && foundItems.length < wantedItems.length) {
+            const timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+            return () => clearInterval(timer);
+        } else if (timeLeft === 0 && status === 'playing') {
+            handleEnd(false);
+        }
+    }, [status, isBooting, timeLeft, foundItems.length, wantedItems.length]);
+
+    const handleItemClick = (item: string, index: number) => {
+        if (status !== 'playing' || isBooting) return;
+
+        if (item === wantedItems[foundItems.length]) {
+            clickSound.current.currentTime = 0;
+            clickSound.current.play().catch(() => {});
+            const newFound = [...foundItems, item];
+            setFoundItems(newFound);
+            if (newFound.length === wantedItems.length) {
+                handleEnd(true);
+            }
+        } else {
+            errorSound.current.currentTime = 0;
+            errorSound.current.play().catch(() => {});
+            setWrongIndex(index);
+            
+            const newMistakes = mistakes + 1;
+            setMistakes(newMistakes);
+            
+            if (newMistakes > 3) {
+                handleEnd(false);
+            }
+            
+            setTimeout(() => setWrongIndex(null), 500);
+        }
+    };
+
+    const handleEnd = (success: boolean) => {
+        setStatus(success ? 'won' : 'lost');
+        fetchNui('hackingEnd', { outcome: success, sessionId });
+        if (success) {
+            // Play success sound
+            const aud = new Audio('assets/success.ogg');
+            aud.play().catch(() => {});
+            setTimeout(closeGame, 2000);
+        } else {
+             // Play fail sound
+             const aud = new Audio('assets/failed.ogg');
+             aud.play().catch(() => {});
+             setTimeout(() => {
+                 window.location.reload(); // Reload or close? User said remove button. Reload seems appropriate for retry, or closeGame if they should fail out. Usually fail out. 
+                 // Actually, if failed, they might need to restart somewhat? 
+                 // User said "remove button when minigame ends and show access denied text in center of console".
+                 // I'll leave it showing then close or let them reload? "far uscire la scritta... e non a destra fuori"
+                 // I'll show the text, then close after a delay maybe? Or just leave it?
+                 // Usually minigames close on fail. I'll setup a timeout to closeGame after showing result.
+                 setTimeout(closeGame, 3000); 
+             }, 3000);
+        }
+    };
+
+    return (
+        <div className="hacking-container pro-theme">
+            <div className="laptop-frame-container">
+                {/* User-Provided SVG Laptop Trace */}
+                <img 
+                    src="assets/laptop-frame.svg" 
+                    alt="Terminal Frame" 
+                    className="laptop-frame-img"
+                    draggable={false}
+                />
+
+                {/* Mounted Terminal Screen */}
+                <div className="screen-content-mount">
+                    <div className="screen-effects">
+                        <div className="scanlines"></div>
+                        <div className="screen-smudge"></div>
+                        <div className="crt-flicker"></div>
+                    </div>
+
+                    <AnimatePresence mode="wait">
+                        {status !== 'playing' ? (
+                            <motion.div 
+                                key="result"
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0 }}
+                                className={`result-overlay-screen ${status}`}
+                            >
+                                <motion.div 
+                                    initial={{ y: 20 }}
+                                    animate={{ y: 0 }}
+                                    className="result-content"
+                                >
+                                    <h2 className="glitch-text">{status === 'won' ? 'ACCESS GRANTED' : 'ACCESS DENIED'}</h2>
+                                    <div className="status-line"></div>
+                                    <p>{status === 'won' ? 'SYSTEM OVERRIDE COMPLETE' : 'SECURITY PROTOCOL TRIGGERED'}</p>
+                                </motion.div>
+                            </motion.div>
+                        ) : (
+                            <motion.div 
+                                key="game"
+                                className="game-window"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                            >
+                                {isBooting ? (
+                                    <BootSequence onComplete={() => setIsBooting(false)} />
+                                ) : (
+                                    <>
+                                        <div className="window-header">
+                                            <div className="header-left">
+                                                <span className="terminal-path">TERMINAL NODE DECRYPTION</span>
+                                            </div>
+                                            <div className="header-right">
+                                                <span>user@mbt-osc ~ /session_{displaySessionId}</span>
+                                                <motion.span 
+                                                    animate={{ opacity: [0, 1, 0] }}
+                                                    transition={{ duration: 1, repeat: Infinity }}
+                                                    className="cursor"
+                                                >_</motion.span>
+                                            </div>
+                                            <div className="mistakes-counter" style={{ color: mistakes > 2 ? 'red' : '#fff', marginLeft: '10px' }}>
+                                                ERRORS: {mistakes}/4
+                                            </div>
+                                        </div>
+
+                                        <div className="instruction-strip">
+                                            IDENTIFY SEQUENCE PATTERN IN DESIGNATED ORDER
+                                        </div>
+
+                                        <div className="hacking-layout">
+                                            <div className="grid-container">
+                                                {gridItems.map((item, idx) => (
+                                                    <motion.div
+                                                        key={idx}
+                                                        whileHover={{ scale: 1.05, backgroundColor: "rgba(0, 242, 255, 0.2)" }}
+                                                        whileTap={{ scale: 0.95 }}
+                                                        className={`hacking-grid-item ${foundItems.includes(item) ? 'selected' : ''} ${idx === wrongIndex ? 'wrong' : ''}`}
+                                                        onClick={() => handleItemClick(item, idx)}
+                                                        onMouseEnter={() => { hoverSound.current.currentTime = 0; hoverSound.current.play().catch(()=>{}); }}
+                                                    >
+                                                        {item}
+                                                    </motion.div>
+                                                ))}
+                                            </div>
+
+                                            <div className="hacking-sidebar">
+                                                <div className="sidebar-title">TARGET SEQUENCE</div>
+                                                <div className="wanted-sequence">
+                                                    {wantedItems.map((item, idx) => (
+                                                        <div 
+                                                            key={idx} 
+                                                            className={`sequence-item ${idx < foundItems.length ? 'found' : idx === foundItems.length ? 'active' : 'pending'}`}
+                                                        >
+                                                            {item}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="timer-box">
+                                                    {timeLeft}s
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default HackingGame;

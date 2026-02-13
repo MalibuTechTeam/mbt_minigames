@@ -1,0 +1,134 @@
+.wirefix-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 850px;
+    height: 700px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--neon-cyan);
+    border-radius: 12px;
+    box-shadow: 0 0 30px rgba(0, 242, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+}
+
+.wirefix-header {
+    background: rgba(0,0,0,0.5);
+    padding: 20px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--glass-border);
+    letter-spacing: 2px;
+    font-weight: bold;
+}
+
+.wirefix-timer {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2rem;
+    color: var(--neon-pink);
+    text-shadow: 0 0 10px rgba(255, 0, 102, 0.5);
+}
+
+.wirefix-board {
+    flex: 1;
+    position: relative;
+    padding: 20px 80px;
+    display: flex;
+    justify-content: space-between;
+    background-image: 
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+
+.wire-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    z-index: 10;
+    height: 100%;
+}
+
+.connector {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    border: 2px solid rgba(255,255,255,0.2);
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.connector:hover {
+    transform: scale(1.15);
+    border-color: white;
+}
+
+.connector::after {
+    content: '';
+    width: 12px;
+    height: 12px;
+    background: white;
+    border-radius: 2px;
+    box-shadow: 0 0 10px white;
+}
+
+.connector.connected {
+    cursor: default;
+    border-color: var(--neon-green);
+    box-shadow: 0 0 15px var(--neon-green);
+}
+
+/* Wire Paths */
+.wire-path {
+    fill: none;
+    stroke-width: 14;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 8px rgba(0,0,0,0.8));
+    transition: stroke 0.3s;
+}
+
+.wire-path.active {
+  animation: pulse-glow 2s infinite ease-in-out;
+  stroke-dasharray: 20, 10;
+  animation: flow 1s linear infinite, pulse-glow 2s infinite ease-in-out;
+}
+
+@keyframes flow {
+  from { stroke-dashoffset: 30; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes pulse-glow {
+  0% { filter: drop-shadow(0 0 5px currentColor); opacity: 0.8; }
+  50% { filter: drop-shadow(0 0 15px currentColor); opacity: 1; }
+  100% { filter: drop-shadow(0 0 5px currentColor); opacity: 0.8; }
+}
+
+.wire-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.warning-text {
+    position: absolute;
+    bottom: 10px;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 0.7rem;
+    color: #666;
+    letter-spacing: 1px;
+}

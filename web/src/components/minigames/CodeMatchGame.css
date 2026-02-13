@@ -1,0 +1,110 @@
+.codematch-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 800px;
+    height: 600px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--neon-cyan);
+    border-radius: 8px;
+    box-shadow: 0 0 30px rgba(0, 242, 255, 0.15);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    color: #c9d1d9;
+    font-family: 'JetBrains Mono', monospace;
+    overflow: hidden;
+}
+
+.codematch-header {
+    background: rgba(0,0,0,0.6);
+    border-bottom: 1px solid var(--glass-border);
+    padding: 20px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.1rem;
+    letter-spacing: 3px;
+}
+
+.code-timer {
+    color: var(--neon-pink);
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+.matching-area {
+    display: flex;
+    flex: 1;
+    padding: 30px;
+    gap: 40px;
+    position: relative;
+}
+
+.code-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.code-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 18px;
+    border-radius: 4px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    font-size: 1.2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.code-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+    transition: 0.5s;
+}
+
+.code-item:hover::before {
+    left: 100%;
+}
+
+.code-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--neon-cyan);
+    transform: translateX(5px);
+}
+
+.code-item.selected {
+    background: rgba(0, 242, 255, 0.15);
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+}
+
+.code-item.matched {
+    opacity: 0.2;
+    pointer-events: none;
+    border-color: var(--neon-green);
+    background: rgba(57, 255, 20, 0.05);
+}
+
+.corruption-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, transparent 1px);
+    background-size: 100% 2px;
+    pointer-events: none;
+}

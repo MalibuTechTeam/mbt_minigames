@@ -1,0 +1,129 @@
+.boltturn-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 700px;
+    height: 550px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--neon-cyan);
+    border-radius: 12px;
+    box-shadow: 0 0 40px rgba(0, 242, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+    padding: 30px;
+    color: white;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.boltturn-header {
+    text-align: left;
+    font-size: 1.4rem;
+    margin-bottom: 40px;
+    border-left: 4px solid var(--neon-cyan);
+    padding-left: 15px;
+    letter-spacing: 2px;
+}
+
+.bolts-area {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex: 1;
+}
+
+.bolt-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 25px;
+    perspective: 1000px;
+}
+
+.bolt-svg-container {
+    width: 130px;
+    height: 130px;
+    cursor: pointer;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.1s linear;
+}
+
+.bolt-svg-container:active {
+    scale: 0.95;
+}
+
+.bolt-svg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
+}
+
+/* Progress and Heat indicators */
+.status-indicators {
+    width: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.indicator-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.fill-progress {
+    height: 100%;
+    background: var(--neon-cyan);
+    box-shadow: 0 0 10px var(--neon-cyan);
+    transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1);
+}
+
+.fill-heat {
+    height: 100%;
+    background: var(--neon-pink);
+    box-shadow: 0 0 10px var(--neon-pink);
+    transition: width 0.1s;
+}
+
+.label-small {
+    font-size: 0.65rem;
+    color: #888;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+}
+
+.bolt-done .fill-progress {
+    background: var(--neon-green);
+    box-shadow: 0 0 10px var(--neon-green);
+}
+
+.overheated {
+    animation: shake 0.5s infinite;
+}
+
+@keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    50% { transform: translateX(2px); }
+    75% { transform: translateX(-2px); }
+    100% { transform: translateX(0); }
+}
+
+.sparks-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 200%;
+    height: 200%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 5;
+}

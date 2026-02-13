@@ -1,0 +1,96 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;700&display=swap');
+
+:root {
+  --neon-cyan: #00f2ff;
+  --neon-pink: #ff0066;
+  --neon-green: #39ff14;
+  --glass-bg: rgba(13, 17, 23, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --scanline-color: rgba(18, 16, 16, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #root {
+  background: transparent !important;
+  background-color: transparent !important;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  font-family: 'Outfit', sans-serif;
+  color: #c9d1d9;
+}
+
+/* Scanline Overlay */
+.scanline-overlay::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(var(--scanline-color) 50%, rgba(0, 0, 0, 0) 50%),
+              linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+  z-index: 1000;
+  background-size: 100% 4px, 3px 100%;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+/* CRT Flicker Effect */
+@keyframes flicker {
+  0% { opacity: 0.97; }
+  5% { opacity: 0.95; }
+  10% { opacity: 0.9; }
+  15% { opacity: 0.95; }
+  25% { opacity: 0.97; }
+  30% { opacity: 0.92; }
+  45% { opacity: 0.95; }
+  50% { opacity: 0.9; }
+  65% { opacity: 0.95; }
+  80% { opacity: 0.9; }
+  90% { opacity: 0.95; }
+  100% { opacity: 0.97; }
+}
+
+.crt-effect {
+  animation: flicker 0.15s infinite;
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+}
+
+.neon-text-cyan {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+}
+
+.neon-text-pink {
+  color: var(--neon-pink);
+  text-shadow: 0 0 10px rgba(255, 0, 102, 0.5);
+}
+
+.neon-border-cyan {
+  border-color: var(--neon-cyan) !important;
+  box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+}
+
+svg {
+  pointer-events: none;
+}
+
+svg * {
+  pointer-events: auto;
+}

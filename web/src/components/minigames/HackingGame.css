@@ -1,0 +1,407 @@
+.hacking-container {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #000;
+    overflow: hidden;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* Minimalist Layout - No Background */
+.hacking-container.pro-theme {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: transparent; /* Removed background per user request */
+    overflow: hidden;
+}
+
+/* Removed ::before pseudo-element for grid effect */
+
+.laptop-frame-container {
+    position: relative;
+    /* Scale based on height to ensure it fits vertically first, preventing crop */
+    height: 90vh; /* 90% of viewport height */
+    width: auto;
+    aspect-ratio: 1920 / 1080;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    max-width: 95vw; /* Ensure it also fits horizontally */
+}
+
+.laptop-frame-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+    /* Removed drop-shadow to clean up look if no background */
+}
+
+.result-overlay-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 200;
+}
+
+.result-content {
+    text-align: center;
+    padding: 5vmin;
+    position: relative;
+    overflow: hidden;
+    min-width: 50%;
+    /* Terminal style overlay */
+    background: rgba(0, 20, 40, 0.9);
+    border: 0.2vmin solid var(--neon-cyan);
+    box-shadow: 0 0 5vmin rgba(0, 242, 255, 0.2);
+}
+
+.result-overlay-screen.won .result-content {
+    border-color: var(--neon-green);
+    box-shadow: 0 0 5vmin var(--neon-green), inset 0 0 2vmin var(--neon-green);
+}
+
+.result-overlay-screen.lost .result-content {
+    border-color: var(--neon-pink);
+    box-shadow: 0 0 5vmin var(--neon-pink), inset 0 0 2vmin var(--neon-pink);
+}
+
+.glitch-text {
+    font-size: 5vmin;
+    font-weight: 900;
+    letter-spacing: 1vmin;
+    color: #fff;
+    text-transform: uppercase;
+    position: relative;
+    animation: glitch 1s infinite linear alternate-reverse;
+}
+
+.result-overlay-screen.won .glitch-text {
+    text-shadow: 0.3vmin 0.3vmin 0px #0f0, -0.3vmin -0.3vmin 0px cyan;
+    color: #0f0;
+}
+
+.result-overlay-screen.lost .glitch-text {
+    text-shadow: 0.3vmin 0.3vmin 0px #f00, -0.3vmin -0.3vmin 0px blue;
+    color: #f00;
+}
+
+.status-line {
+    width: 100%;
+    height: 0.5vmin;
+    background: #fff;
+    margin: 3vmin 0;
+    position: relative;
+    overflow: hidden;
+    opacity: 0.5;
+}
+
+.status-line::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, #fff, transparent);
+    animation: loading 1.5s infinite;
+}
+
+.result-overlay-screen p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2vmin;
+    color: #eee;
+    letter-spacing: 0.2vmin;
+    text-transform: uppercase;
+}
+
+@keyframes glitch {
+    0% { transform: translate(0) }
+    20% { transform: translate(-0.2vmin, 0.2vmin) }
+    40% { transform: translate(-0.2vmin, -0.2vmin) }
+    60% { transform: translate(0.2vmin, 0.2vmin) }
+    80% { transform: translate(0.2vmin, -0.2vmin) }
+    100% { transform: translate(0) }
+}
+
+@keyframes loading {
+    0% { left: -100% }
+    100% { left: 100% }
+}
+
+.screen-content-mount {
+    position: absolute;
+    top: 8.06%;
+    left: 18.28%;
+    width: 63.39%;
+    height: 70.09%;
+    background: #050505;
+    overflow: hidden;
+    border-radius: 2px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+}
+
+/* Post-Processing Overlays */
+.screen-effects {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.6) 100%);
+}
+
+.scanlines {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.5) 50%);
+    background-size: 100% 0.5vmin;
+    pointer-events: none;
+}
+
+.window-header {
+    background: rgba(0, 20, 40, 0.95);
+    padding: 1vmin 2vmin;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 0.2vmin solid var(--neon-cyan);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.5vmin;
+    color: #fff;
+    text-shadow: 0 0 5px var(--neon-cyan);
+}
+
+.instruction-strip {
+    background: rgba(0, 242, 255, 0.15);
+    padding: 1vmin;
+    text-align: center;
+    font-size: 1.5vmin;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #fff;
+    border-bottom: 0.1vmin solid rgba(0, 242, 255, 0.3);
+    text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+}
+
+.hacking-layout {
+    flex: 1;
+    display: flex;
+    padding: 2vmin;
+    gap: 2vmin;
+    position: relative;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.8);
+    height: 100%; /* Ensure layout takes full available height */
+}
+
+.grid-container {
+    flex: 1;
+    display: grid;
+    /* Explicitly define rows and ensure container height is respected */
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(7, 1fr);
+    gap: 0.4vmin;
+    padding: 0.5vmin;
+    background: rgba(0, 20, 40, 0.5);
+    border: 1px solid rgba(0, 242, 255, 0.2);
+    border-radius: 4px;
+    height: 100%; /* Force grid to fill vertical space */
+    box-sizing: border-box;
+    align-content: stretch;
+}
+
+.hacking-grid-item {
+    background: rgba(10, 30, 50, 0.8);
+    border: 1px solid rgba(0, 242, 255, 0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.8vmin;
+    font-weight: bold;
+    color: #a0a0a0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 2px;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.hacking-grid-item:hover {
+    background: rgba(0, 242, 255, 0.3);
+    border-color: var(--neon-cyan);
+    color: #fff;
+    box-shadow: 0 0 15vmin rgba(0, 242, 255, 0.4);
+    transform: scale(1.05);
+    z-index: 2;
+}
+
+.hacking-grid-item.selected {
+    background: rgba(0, 255, 0, 0.2);
+    border-color: #0f0;
+    color: #0f0;
+    box-shadow: 0 0 15px #0f0, inset 0 0 10px rgba(0, 255, 0, 0.5);
+    font-weight: 900;
+    text-shadow: 0 0 5px #0f0;
+    animation: pulse-green 1.5s infinite;
+}
+
+.hacking-grid-item.wrong {
+    background: rgba(255, 0, 0, 0.2);
+    border-color: #f00;
+    color: #f00;
+    box-shadow: 0 0 15px #f00, inset 0 0 10px rgba(255, 0, 0, 0.5);
+    animation: shake 0.3s;
+}
+
+@keyframes pulse-green {
+    0% { box-shadow: 0 0 15px #0f0, inset 0 0 10px rgba(0, 255, 0, 0.5); }
+    50% { box-shadow: 0 0 25px #0f0, inset 0 0 15px rgba(0, 255, 0, 0.7); }
+    100% { box-shadow: 0 0 15px #0f0, inset 0 0 10px rgba(0, 255, 0, 0.5); }
+}
+
+.hacking-sidebar {
+    width: 25%;
+    display: flex;
+    flex-direction: column;
+    gap: 2vmin;
+    background: rgba(0, 10, 20, 0.9);
+    padding: 2vmin;
+    border: 1px solid var(--neon-cyan);
+    box-shadow: 0 0 15px rgba(0, 242, 255, 0.1);
+    border-radius: 4px;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.sidebar-title {
+    font-size: 1.8vmin;
+    color: #fff;
+    text-shadow: 0 0 5px var(--neon-cyan);
+    letter-spacing: 2px;
+    text-align: center;
+    border-bottom: 1px solid var(--neon-cyan);
+    padding-bottom: 1vmin;
+    font-weight: 900;
+    font-family: 'Courier New', Courier, monospace;
+    text-transform: uppercase;
+}
+
+.wanted-sequence {
+    display: flex;
+    flex-direction: column;
+    gap: 1vmin;
+    flex: 1;
+    overflow-y: auto;
+    /* Hide scrollbar for cleaner UI */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+}
+
+.wanted-sequence::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
+.sequence-item {
+    padding: 1vmin;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+    font-size: 2vmin;
+    font-weight: bold;
+    border-radius: 3px;
+    font-family: 'Courier New', Courier, monospace;
+    transition: all 0.3s;
+    color: #fff; /* Increased contrast from #555 */
+}
+
+/* Current target - HIGH VISIBILITY */
+.sequence-item.active {
+    background: rgba(0, 242, 255, 0.15);
+    border: 2px solid var(--neon-cyan);
+    color: #fff;
+    box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+    transform: scale(1.05);
+}
+
+/* Found items */
+.sequence-item.found {
+    background: rgba(57, 255, 20, 0.2);
+    border: 1px solid var(--neon-green);
+    color: var(--neon-green);
+    opacity: 0.7;
+    text-decoration: line-through;
+}
+
+/* Pending items */
+.sequence-item.pending {
+    color: #888;
+    border-style: dashed;
+}
+
+.timer-box {
+    margin-top: auto;
+    font-size: 5vmin;
+    text-align: center;
+    color: #fff;
+    text-shadow: 0 0 10px var(--neon-pink);
+    font-weight: 900;
+    background: rgba(255, 0, 0, 0.1);
+    border-radius: 4px;
+    padding: 1vmin;
+    border: 1px solid rgba(255, 0, 0, 0.3);
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.boot-sequence {
+    flex: 1;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding: 4vmin;
+    font-family: 'Courier New', Courier, monospace;
+    color: #0f0;
+    font-size: 1.8vmin;
+    gap: 1.5vmin;
+    overflow-y: auto;
+    width: 100%;
+    height: 100%;
+}
+
+.boot-line {
+    width: 100%;
+    text-shadow: 0 0 5px #0f0;
+    opacity: 0.9;
+}
+
+.boot-cursor {
+    color: #0f0;
+    font-weight: bold;
+    text-shadow: 0 0 5px #0f0;
+}
+
+@keyframes gridMove {
+    0% { transform: perspective(500px) rotateX(60deg) translateY(0) translateZ(-200px); }
+    100% { transform: perspective(500px) rotateX(60deg) translateY(50px) translateZ(-200px); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
