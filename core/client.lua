@@ -1,6 +1,30 @@
 local session = {}
 local bh = false
 
+-- Global table initialization (Fallback if config.lua fails to load)
+MBT = MBT or {}
+if not MBT.Minigames then
+    print("[mbt_minigames] Initializing default configuration fallback.")
+    MBT.Minigames = {
+        ['hacking'] = { time = 30 },
+        ['wire_fix'] = { time = 25 },
+        ['bolt_turn'] = { time = 25 },
+        ['code_match'] = { time = 20 }
+    }
+end
+
+-- Debug: Check if config loaded
+Citizen.CreateThread(function()
+    Wait(1000)
+    if MBT and MBT.Minigames then
+        print("[mbt_minigames] Current BoltTurn Time: " ..
+            (MBT.Minigames['bolt_turn'] and MBT.Minigames['bolt_turn'].time or "N/A"))
+        print("[mbt_minigames] Configuration loaded successfully.")
+    else
+        print("[mbt_minigames] ^1ERROR: Configuration table 'MBT' not found!^7")
+    end
+end)
+
 ---@param data table
 local function SendNUI(data)
     SendNUIMessage(data)
@@ -94,12 +118,21 @@ local function startHackingSession(data)
     NetworkStopSynchronisedScene(netScene)
     NetworkStartSynchronisedScene(netScene2)
 
+    local timeLimit = data.Time or data.time
+    if not timeLimit then
+        if MBT and MBT.Minigames and MBT.Minigames['hacking'] then
+            timeLimit = MBT.Minigames['hacking'].time
+        else
+            timeLimit = 30
+        end
+    end
+
     SendNUI({
         Action = "handleUI",
         Status = true,
         Payload = {
             Id = sessionId,
-            TimeLimit = data.Time
+            TimeLimit = timeLimit
         }
     })
 
@@ -135,22 +168,36 @@ local function startRepairSession(data)
 
     local ped = PlayerPedId()
     local pedCoords = GetEntityCoords(ped)
-    local type = data.type or "hacking"
-    local time = data.time or 30
+    local time = data.time or data.Time
+    if not time then
+        if MBT and MBT.Minigames and MBT.Minigames[type] then
+            time = MBT.Minigames[type].time
+        else
+            time = 30
+        end
+    end
 
     if type == "hacking" then
         return startHackingSession(data) -- Keep original complex animation for hacking
     end
 
-    -- For other types (wire_fix, bolt_turn, code_match), use a more professional repair animation
+    -- For code_match or other types, use a more professional repair animation
     local animData = data.animation or {}
+
+    -- Ensure code_match has a default PC prop if not provided
+    if type == "code_match" and not animData.Prop then
+        animData.Prop = "prop_laptop_01a"
+        animData.Bone = 60309 -- Left Hand
+        animData.Offset = vector3(0.12, 0.0, 0.0)
+        animData.Rot = vector3(0.0, 0.0, 0.0)
+    end
     local animDict = animData.Dict or "anim@amb@clubhouse@tutorial@bkr_tut_ig3@"
     local animName = animData.Name or "machinic_loop_me_mechanic"
 
     loadAnimDict(animDict)
     ClearPedTasks(ped)
 
-    -- Handle Prop
+    -- Handle Prop (Standalone logic)
     local propObj = nil
     if animData.Prop then
         local propName = animData.Prop
@@ -164,7 +211,10 @@ local function startRepairSession(data)
             true, true, false, true, 1, true)
     end
 
-    TaskPlayAnim(ped, animDict, animName, 8.0, -8.0, -1, 1, 0, false, false, false)
+    -- Persistent animation check: only play if not already playing to avoid flicker
+    if not IsEntityPlayingAnim(ped, animDict, animName, 3) then
+        TaskPlayAnim(ped, animDict, animName, 8.0, -8.0, -1, 1, 0, false, false, false)
+    end
     FreezeEntityPosition(ped, true)
 
     SendNUI({

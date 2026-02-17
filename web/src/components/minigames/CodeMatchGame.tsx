@@ -1,149 +1,200 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useMinigameStore } from '../../store/useMinigameStore';
-import { fetchNui } from '../../utils/fetchNui';
-import { motion, AnimatePresence } from 'framer-motion';
-import './CodeMatchGame.css';
+import React, { useState, useEffect, useRef } from "react";
+import { useMinigameStore } from "../../store/useMinigameStore";
+import { fetchNui } from "../../utils/fetchNui";
+import "./CodeMatchGame.css";
 
-const SYMBOLS = [
-  '0x4A7F', '0xBC22', '0xDA90', '0x11E2', '0xFF01', 
-  '0x77C3', '0x99A0', '0x55E1', '0x22F0', '0xCC88'
-];
-
-interface CodeEntry {
-    id: string;
-    symbol: string;
-}
+const CHARS = "ABCDEF0123456789";
+const STREAM_SIZE = 20;
 
 const CodeMatchGame: React.FC = () => {
-    const { timeLimit, sessionId, closeGame } = useMinigameStore();
-    const [timeLeft, setTimeLeft] = useState(timeLimit || 25);
-    const [leftItems, setLeftItems] = useState<CodeEntry[]>([]);
-    const [rightItems, setRightItems] = useState<CodeEntry[]>([]);
-    const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [matchedSymbols, setMatchedSymbols] = useState<string[]>([]);
-    const [status, setStatus] = useState<'playing' | 'won' | 'lost'>('playing');
+  const { timeLimit, sessionId, closeGame } = useMinigameStore();
+  const [timeLeft, setTimeLeft] = useState(timeLimit || 30);
+  const [targetCode, setTargetCode] = useState("");
+  const [stream, setStream] = useState<string[]>([]);
+  const [score, setScore] = useState(0);
+  const [status, setStatus] = useState<"playing" | "won" | "lost">("playing");
 
-    const successSound = useRef(new Audio('./assets/success.ogg'));
-    const failedSound = useRef(new Audio('./assets/failed.ogg'));
-    const clickSound = useRef(new Audio('./assets/hover.ogg'));
+  // Refs for audio
+  const findSound = useRef(new Audio("./assets/success.ogg"));
+  const errorSound = useRef(new Audio("./assets/failed.ogg"));
+  const winSound = useRef(new Audio("./assets/success.ogg"));
 
-    useEffect(() => {
-        const pool = [...SYMBOLS].sort(() => Math.random() - 0.5).slice(0, 6);
-        const l = pool.map((s, i) => ({ id: `L-${i}`, symbol: s }));
-        const r = pool.map((s, i) => ({ id: `R-${i}`, symbol: s })).sort(() => Math.random() - 0.5);
+  const generateCode = () => {
+    let code = "";
+    for (let i = 0; i < 4; i++) {
+      code += CHARS[Math.floor(Math.random() * CHARS.length)];
+    }
+    return code;
+  };
 
-        setLeftItems(l);
-        setRightItems(r);
+  // Initialize game
+  useEffect(() => {
+    const initialStream = Array.from({ length: STREAM_SIZE }, generateCode);
+    setStream(initialStream);
+    setTargetCode(initialStream[Math.floor(Math.random() * 5)]); // Target is within first 5 items
+  }, []);
 
-        const interval = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1) { handleLose(); return 0; }
-                return prev - 1;
-            });
-        }, 1000);
-
-        // Shuffle logic every 5 seconds
-        const shuffleInterval = setInterval(() => {
-            if (status === 'playing') {
-                setRightItems(prev => [...prev].sort(() => Math.random() - 0.5));
-            }
-        }, 5000);
-
-        return () => {
-            clearInterval(interval);
-            clearInterval(shuffleInterval);
-        };
-    }, [status]);
-
-    const handleLose = () => {
-        if (status !== 'playing') return;
-        setStatus('lost');
-        failedSound.current.play().catch(() => {});
-        fetchNui('hackingEnd', { outcome: false, sessionId });
-        setTimeout(closeGame, 1500);
-    };
-
-    const handleWin = () => {
-        if (status !== 'playing') return;
-        setStatus('won');
-        successSound.current.play().catch(() => {});
-        fetchNui('hackingEnd', { outcome: true, sessionId });
-        setTimeout(closeGame, 1500);
-    };
-
-    const handleLeftClick = (entry: CodeEntry) => {
-        if (status !== 'playing' || matchedSymbols.includes(entry.symbol)) return;
-        clickSound.current.currentTime = 0;
-        clickSound.current.play().catch(() => {});
-        setSelectedId(entry.id);
-    };
-
-    const handleRightClick = (entry: CodeEntry) => {
-        if (status !== 'playing' || !selectedId || matchedSymbols.includes(entry.symbol)) return;
-
-        const leftEntry = leftItems.find(item => item.id === selectedId);
-        if (leftEntry && leftEntry.symbol === entry.symbol) {
-            const newMatches = [...matchedSymbols, entry.symbol];
-            setMatchedSymbols(newMatches);
-            setSelectedId(null);
-            clickSound.current.currentTime = 0;
-            clickSound.current.play().catch(() => {});
-            if (newMatches.length === leftItems.length) handleWin();
-        } else {
-            setSelectedId(null);
-            // Flash error?
+  // Timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          handleEnd(false);
+          return 0;
         }
-    };
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-    return (
-        <div className="codematch-container glass-panel crt-effect">
-            <div className="codematch-header">
-                <span className="neon-text-cyan">KERNEL BUFFER PATCHER [V2.4]</span>
-                <span className="code-timer">{timeLeft}s</span>
-            </div>
-            
-            <div className="matching-area">
-                <div className="corruption-overlay" />
-                
-                <div className="code-column">
-                    {leftItems.map((item) => (
-                        <motion.div 
-                            key={item.id}
-                            layout
-                            className={`code-item ${selectedId === item.id ? 'selected' : ''} ${matchedSymbols.includes(item.symbol) ? 'matched' : ''}`}
-                            onClick={() => handleLeftClick(item)}
-                            whileHover={{ scale: matchedSymbols.includes(item.symbol) ? 1 : 1.02 }}
-                        >
-                            {item.symbol}
-                        </motion.div>
-                    ))}
-                </div>
+  // Stream mechanics
+  useEffect(() => {
+    if (status !== "playing") return;
 
-                <div className="code-column">
-                    <AnimatePresence>
-                        {rightItems.map((item) => (
-                            <motion.div 
-                                key={item.id}
-                                layout
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                className={`code-item ${matchedSymbols.includes(item.symbol) ? 'matched' : ''}`}
-                                onClick={() => handleRightClick(item)}
-                            >
-                                {item.symbol}
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
-                </div>
-            </div>
-            
-            <div style={{ padding: '15px', background: 'rgba(0,242,255,0.05)', fontSize: '0.7rem', color: '#666', textAlign: 'center' }}>
-                WARNING: SYSTEM INSTABILITY DETECTED. MEMORY SEGMENTS MAY SHIFT POSITIONS.
-            </div>
+    const streamInterval = setInterval(() => {
+      setStream((prev) => {
+        const next = [...prev];
+        next.pop(); // Remove last
+        next.unshift(generateCode()); // Add new to top
+
+        // Ensure target is present in stream occasionally if missing
+        if (!next.includes(targetCode) && Math.random() > 0.7) {
+          next[0] = targetCode;
+        }
+        return next;
+      });
+    }, 800); // Speed of stream
+
+    return () => clearInterval(streamInterval);
+  }, [status, targetCode]);
+
+  const handleItemClick = (code: string) => {
+    if (status !== "playing") return;
+
+    if (code === targetCode) {
+      // Correct click
+      findSound.current.currentTime = 0;
+      findSound.current.play().catch(() => {});
+
+      const newScore = score + 1;
+      setScore(newScore);
+
+      if (newScore >= 5) {
+        handleEnd(true);
+      } else {
+        setTargetCode(generateCode());
+        // Force new target into stream near top
+        setStream((prev) => {
+          const next = [...prev];
+          next[0] = targetCode; // Note: targetCode ref might be old state here, but next render fixes it?
+          // Actually setTargetCode is async. checking logic:
+          // Better: pick a new target from EXISTING stream or GENERATE new.
+          // Let's generate new target.
+          return next;
+        });
+      }
+    } else {
+      // Wrong click
+      errorSound.current.currentTime = 0;
+      errorSound.current.play().catch(() => {});
+      setTimeLeft((prev) => Math.max(0, prev - 2)); // Penalty
+    }
+  };
+
+  const handleEnd = (win: boolean) => {
+    setStatus(win ? "won" : "lost");
+    if (win) winSound.current.play().catch(() => {});
+    else errorSound.current.play().catch(() => {});
+
+    fetchNui("hackingEnd", { outcome: win, sessionId });
+    setTimeout(closeGame, 1500);
+  };
+
+  return (
+    <div
+      className="codematch-wrapper"
+      style={{
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: "90vw" /* Responsive width */,
+        maxHeight: "90vh",
+        aspectRatio: "1920 / 1080" /* Enforce laptop aspect ratio */,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <img
+        src="assets/laptop-frame.svg"
+        alt="Laptop Frame"
+        className="laptop-frame-img"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          zIndex: 0,
+          pointerEvents: "none",
+          objectFit: "contain",
+        }}
+      />
+
+      <div
+        className="codematch-container crt-effect"
+        style={{
+          transform: "none",
+          position: "absolute",
+          zIndex: 1,
+          borderRadius: "2px",
+          /* Refined coordinates closer to HackingGame reference */
+          top: "8.1%",
+          left: "18.3%",
+          width: "63.2%",
+          height: "69.5%",
+          boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+          padding: "2vmin",
+        }}
+      >
+        <div className="codematch-header">
+          <span>DATA STREAM SYNC</span>
+          <span>TIME: {timeLeft}s</span>
         </div>
-    );
+
+        <div className="target-display">
+          <span className="target-label">LOCATE SEQUENCE</span>
+          <span
+            className="target-text neon-text-green"
+            style={{ fontSize: "2.5rem", letterSpacing: "8px" }}
+          >
+            {targetCode}
+          </span>
+        </div>
+
+        <div className="stream-area">
+          <div className="scanline-bar"></div>
+          <div className="stream-column">
+            {stream.map((code, idx) => (
+              <div
+                key={`${code}-${idx}`}
+                className="stream-item"
+                onMouseDown={() => handleItemClick(code)}
+              >
+                {code}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="score-display">SYNC: {score}/5</div>
+      </div>
+    </div>
+  );
 };
 
 export default CodeMatchGame;

@@ -8,6 +8,7 @@ version '1.0.3'
 description 'A collection of mini-games integrated into the Malibù Tech\'s scripts'
 
 client_scripts {
+	'config.lua',
 	'core/client.lua'
 }
 

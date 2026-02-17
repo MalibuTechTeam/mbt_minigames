@@ -1,129 +1,433 @@
+.boltturn-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-height: 90vh;
+  aspect-ratio: 1920 / 1080;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
 .boltturn-container {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 700px;
-    height: 550px;
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--neon-cyan);
-    border-radius: 12px;
-    box-shadow: 0 0 40px rgba(0, 242, 255, 0.2);
-    display: flex;
-    flex-direction: column;
-    padding: 30px;
-    color: white;
-    font-family: 'JetBrains Mono', monospace;
+  position: absolute;
+  top: 8.1%;
+  left: 18.3%;
+  width: 63.2%;
+  height: 69.5%;
+  background: radial-gradient(
+    circle at center,
+    rgba(20, 20, 20, 0.95),
+    #050505
+  );
+  border: 1px solid rgba(255, 157, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.9);
+  z-index: 1;
 }
 
 .boltturn-header {
-    text-align: left;
-    font-size: 1.4rem;
-    margin-bottom: 40px;
-    border-left: 4px solid var(--neon-cyan);
-    padding-left: 15px;
-    letter-spacing: 2px;
+  background: rgba(255, 157, 0, 0.05);
+  padding: 15px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid rgba(255, 157, 0, 0.1);
+  font-family: "JetBrains Mono", monospace;
+  z-index: 10;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .bolts-area {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
+  flex: 1;
+  z-index: 1;
+  padding: 20px;
 }
 
 .bolt-wrapper {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 25px;
-    perspective: 1000px;
+    gap: 15px;
+    position: relative;
+    padding: 20px;
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px;
+    background: rgba(0,0,0,0.3);
 }
 
 .bolt-svg-container {
-    width: 130px;
-    height: 130px;
+    width: 140px;
+    height: 140px;
     cursor: pointer;
     position: relative;
-    transform-style: preserve-3d;
-    transition: transform 0.1s linear;
+    filter: drop-shadow(0 5px 15px rgba(0,0,0,0.7));
+    transition: transform 0.1s;
 }
 
 .bolt-svg-container:active {
-    scale: 0.95;
+    scale: 0.98;
 }
 
-.bolt-svg {
+.valve-knob {
     width: 100%;
     height: 100%;
-    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
 }
 
-/* Progress and Heat indicators */
+.boltturn-title {
+  color: #ff9d00;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(255, 157, 0, 0.5);
+  text-transform: uppercase;
+}
+
+.system-status {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.status-label {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.6rem;
+  letter-spacing: 1px;
+}
+
+.status-bars {
+  display: flex;
+  gap: 5px;
+}
+
+.mini-bar {
+  width: 30px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.mini-progress {
+  height: 100%;
+  background: #ff9d00;
+  box-shadow: 0 0 5px #ff9d00;
+  transition: width 0.3s ease;
+}
+
+.boltturn-timer {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--neon-pink);
+  text-shadow: 0 0 15px rgba(255, 0, 102, 0.7);
+  min-width: 80px;
+  text-align: right;
+}
+
+/* Progress HUD around valve */
+.valve-hud {
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    width: 160px;
+    height: 160px;
+    pointer-events: none;
+}
+
+.hud-ring {
+    fill: none;
+    stroke: rgba(255,255,255,0.1);
+    stroke-width: 4;
+}
+
+.hud-progress {
+    fill: none;
+    stroke: var(--neon-green);
+    stroke-width: 4;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s;
+    filter: drop-shadow(0 0 5px var(--neon-green));
+}
+
+/* Status Indicators */
 .status-indicators {
-    width: 120px;
+    width: 100%;
     display: flex;
     flex-direction: column;
     gap: 8px;
-}
-
-.indicator-bar {
-    width: 100%;
-    height: 8px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 4px;
-    overflow: hidden;
-    position: relative;
-}
-
-.fill-progress {
-    height: 100%;
-    background: var(--neon-cyan);
-    box-shadow: 0 0 10px var(--neon-cyan);
-    transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1);
-}
-
-.fill-heat {
-    height: 100%;
-    background: var(--neon-pink);
-    box-shadow: 0 0 10px var(--neon-pink);
-    transition: width 0.1s;
+    height: 40px; /* fixed height */
 }
 
 .label-small {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     color: #888;
     text-transform: uppercase;
     display: flex;
     justify-content: space-between;
+    width: 100%;
 }
 
-.bolt-done .fill-progress {
-    background: var(--neon-green);
-    box-shadow: 0 0 10px var(--neon-green);
+/* Heat Indicator replaces simple bar */
+.heat-warning {
+    color: var(--neon-pink);
+    font-weight: bold;
+    font-size: 0.8rem;
+    height: 20px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    text-shadow: 0 0 10px red;
 }
+
+.heating .heat-warning { opacity: 1; }
+.critical .heat-warning { animation: blink 0.2s infinite; }
 
 .overheated {
     animation: shake 0.5s infinite;
 }
 
-@keyframes shake {
-    0% { transform: translateX(0); }
-    25% { transform: translateX(-2px); }
-    50% { transform: translateX(2px); }
-    75% { transform: translateX(-2px); }
-    100% { transform: translateX(0); }
+.overheated .valve-knob circle {
+    fill: #500 !important;
+    stroke: red !important;
 }
 
-.sparks-overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 200%;
-    height: 200%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 5;
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
+@keyframes shake {
+    0% { transform: translateX(0) rotate(0deg); }
+    25% { transform: translateX(-3px) rotate(-1deg); }
+    50% { transform: translateX(3px) rotate(1deg); }
+    75% { transform: translateX(-3px) rotate(-1deg); }
+    100% { transform: translateX(0) rotate(0deg); }
+}
+
+.bolt-done .valve-knob circle {
+  stroke: var(--neon-green);
+  fill: #051a05;
+}
+
+/* NEW HUD ELEMENTS */
+.main-layout {
+  display: flex;
+  flex: 1;
+  width: 100%;
+}
+
+.side-indicators {
+  width: 80px;
+  padding: 20px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  border-right: 1px solid rgba(255, 157, 0, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.container-glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 157, 0, 0.05);
+  border-radius: 4px;
+}
+
+.indicator-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.group-label {
+  font-size: 0.5rem;
+  color: rgba(255, 157, 0, 0.5);
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.tiny-label {
+  font-size: 0.4rem;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.stress-meter {
+  width: 8px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stress-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  transition: height 0.3s ease, background-color 0.3s ease;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.stability-value {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.bottom-hud {
+  height: 120px;
+  display: flex;
+  padding: 15px 30px;
+  gap: 20px;
+  border-top: 1px solid rgba(255, 157, 0, 0.1);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.error-log {
+  flex: 2;
+  padding: 10px 15px;
+  font-size: 0.65rem;
+  overflow: hidden;
+  color: #888;
+}
+
+.log-header {
+  font-size: 0.55rem;
+  color: #ff9d00;
+  margin-bottom: 5px;
+  opacity: 0.6;
+}
+
+.log-entry {
+  font-family: 'JetBrains Mono', monospace;
+  animation: log-fade 0.3s ease-out;
+  line-height: 1.4;
+}
+
+@keyframes log-fade {
+  from { opacity: 0; transform: translateX(-5px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.system-info {
+  flex: 1;
+  padding: 10px 15px;
+  font-size: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* ERROR DOTS */
+.error-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.error-dot {
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transform: rotate(45deg);
+  transition: all 0.3s ease;
+}
+
+.error-dot.filled {
+  background: #ff3366;
+  border-color: #ff3366;
+  box-shadow: 0 0 10px #ff3366;
+  animation: error-pulse 1s infinite;
+}
+
+@keyframes error-pulse {
+  0% { transform: rotate(45deg) scale(1); }
+  50% { transform: rotate(45deg) scale(1.2); }
+  100% { transform: rotate(45deg) scale(1); }
+}
+
+/* STATUS OVERLAY */
+.status-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+}
+
+.status-card {
+  padding: 40px 60px;
+  text-align: center;
+  border: 2px solid;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.status-card.won {
+  border-color: var(--neon-green);
+  box-shadow: 0 0 50px rgba(51, 255, 102, 0.2);
+  color: var(--neon-green);
+}
+
+.status-card.lost {
+  border-color: #ff3366;
+  box-shadow: 0 0 50px rgba(255, 51, 102, 0.2);
+  color: #ff3366;
+}
+
+.blink-text {
+  animation: blink-anim 1s infinite;
+}
+
+@keyframes blink-anim {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.vignette {
+  box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.8);
+}
+
+.glitch-shake {
+  animation: glitch-shake-anim 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+@keyframes glitch-shake-anim {
+  0% { transform: translate(-50%, -50%); }
+  20% { transform: translate(-52%, -48%); filter: brightness(2) hue-rotate(90deg); }
+  40% { transform: translate(-48%, -52%); filter: brightness(2) hue-rotate(180deg); }
+  60% { transform: translate(-51%, -49%); filter: brightness(2) hue-rotate(270deg); }
+  80% { transform: translate(-49%, -51%); filter: brightness(2) hue-rotate(0deg); }
+  100% { transform: translate(-50%, -50%); }
+}
+
+.critical {
+  animation: timer-panic 0.5s infinite !important;
+  color: #ff3366 !important;
+}
+
+@keyframes timer-panic {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); filter: brightness(1.5); }
+  100% { transform: scale(1); }
 }

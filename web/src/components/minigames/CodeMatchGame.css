@@ -1,110 +1,120 @@
 .codematch-container {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 800px;
-    height: 600px;
-    background: var(--glass-bg);
-    backdrop-filter: blur(15px);
-    border: 1px solid var(--neon-cyan);
-    border-radius: 8px;
-    box-shadow: 0 0 30px rgba(0, 242, 255, 0.15);
+    background: rgba(10, 10, 12, 0.95);
+    border: none;
     display: flex;
     flex-direction: column;
-    padding: 0;
-    color: #c9d1d9;
-    font-family: 'JetBrains Mono', monospace;
+    padding: 2vmin;
+    font-family: 'Consolas', 'Monaco', monospace;
     overflow: hidden;
+    color: #0f0;
+    border-radius: 4px;
+}
+
+.codematch-container::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
+    z-index: 10;
 }
 
 .codematch-header {
-    background: rgba(0,0,0,0.6);
-    border-bottom: 1px solid var(--glass-border);
-    padding: 20px 30px;
+    text-align: center;
+    border-bottom: 0.2vmin solid #0f0;
+    padding-bottom: 1vmin;
+    margin-bottom: 2vmin;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 1.1rem;
-    letter-spacing: 3px;
+    text-shadow: 0 0 5px #0f0;
+    z-index: 11;
+    font-size: 1.5vmin;
 }
 
-.code-timer {
-    color: var(--neon-pink);
-    font-weight: bold;
-    font-size: 1.5rem;
-}
-
-.matching-area {
-    display: flex;
-    flex: 1;
-    padding: 30px;
-    gap: 40px;
-    position: relative;
-}
-
-.code-column {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.code-item {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 18px;
-    border-radius: 4px;
+.target-display {
+    background: rgba(0, 50, 0, 0.5);
+    padding: 1.5vmin;
     text-align: center;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    font-size: 1.2rem;
+    border: 1px solid #0f0;
+    margin-bottom: 2vmin;
+    position: relative;
+    z-index: 11;
+    box-shadow: 0 0 1.5vmin rgba(0, 255, 0, 0.2);
+}
+
+.target-label {
+    font-size: 1.2vmin;
+    color: #0a0;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.5vmin;
+}
+
+.target-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 4vmin !important;
+}
+
+.stream-area {
+    flex: 1;
     position: relative;
     overflow: hidden;
+    border: 1px solid rgba(0, 255, 0, 0.2);
+    background: rgba(0, 0, 0, 0.8);
 }
 
-.code-item::before {
-    content: '';
+.stream-column {
     position: absolute;
+    left: 0;
     top: 0;
-    left: -100%;
     width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-    transition: 0.5s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2vmin;
+    transition: transform 0.5s linear;
 }
 
-.code-item:hover::before {
-    left: 100%;
+.stream-item {
+    font-size: 2.5vmin;
+    padding: 1vmin 4vmin;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.1s;
+    opacity: 0.8;
+    color: #0f0;
+    text-shadow: 0 0 5px #0f0;
 }
 
-.code-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: var(--neon-cyan);
-    transform: translateX(5px);
+.stream-item:hover {
+    background: rgba(0, 255, 0, 0.2);
+    border: 1px solid #0f0;
+    text-shadow: 0 0 1.5vmin #0f0;
+    opacity: 1;
+    letter-spacing: 0.2vmin;
+    transform: scale(1.1);
 }
 
-.code-item.selected {
-    background: rgba(0, 242, 255, 0.15);
-    border-color: var(--neon-cyan);
-    color: var(--neon-cyan);
-    box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
-}
-
-.code-item.matched {
-    opacity: 0.2;
-    pointer-events: none;
-    border-color: var(--neon-green);
-    background: rgba(57, 255, 20, 0.05);
-}
-
-.corruption-overlay {
+.scanline-bar {
     position: absolute;
-    top: 0;
+    top: 50%;
     left: 0;
     width: 100%;
-    height: 100%;
-    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, transparent 1px);
-    background-size: 100% 2px;
+    height: 0.4vmin;
+    background: rgba(0, 255, 0, 0.5);
+    box-shadow: 0 0 1vmin #0f0;
     pointer-events: none;
+    z-index: 5;
+    opacity: 0.3;
+}
+
+.score-display {
+    position: absolute;
+    top: 6vmin;
+    right: 3vmin;
+    font-size: 1.5vmin;
+    color: #fff;
+    z-index: 12;
 }
