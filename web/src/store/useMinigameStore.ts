@@ -7,7 +7,9 @@ interface MinigameState {
   gameType: MinigameType;
   sessionId: string | null;
   timeLimit: number;
-  openGame: (type: MinigameType, sessionId: string, timeLimit: number) => void;
+  gameParams: any;
+  locale: any;
+  openGame: (type: MinigameType, sessionId: string, timeLimit: number, gameParams?: any, locale?: any) => void;
   closeGame: () => void;
 }
 
@@ -16,6 +18,9 @@ export const useMinigameStore = create<MinigameState>((set) => ({
   gameType: 'none',
   sessionId: null,
   timeLimit: 0,
-  openGame: (type, sessionId, timeLimit) => set({ show: true, gameType: type, sessionId, timeLimit }),
-  closeGame: () => set({ show: false, gameType: 'none', sessionId: null, timeLimit: 0 }),
+  gameParams: {},
+  locale: {},
+  openGame: (type, sessionId, timeLimit, gameParams = {}, locale = {}) => 
+    set({ show: true, gameType: type, sessionId, timeLimit, gameParams, locale }),
+  closeGame: () => set({ show: false, gameType: 'none', sessionId: null, timeLimit: 0, gameParams: {}, locale: {} }),
 }));

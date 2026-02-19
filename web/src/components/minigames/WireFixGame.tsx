@@ -19,10 +19,10 @@ interface WirePoint {
   side: "left" | "right";
 }
 
-const SHUFFLE_INTERVAL = 5000; // ms
-
 const WireFixGame: React.FC = () => {
-  const { timeLimit, sessionId, closeGame } = useMinigameStore();
+  const { timeLimit, sessionId, closeGame, gameParams, locale } =
+    useMinigameStore();
+  const wireLocale = locale?.wire_fix || {};
   const [timeLeft, setTimeLeft] = useState(timeLimit || 25);
   const [leftWires, setLeftWires] = useState<WirePoint[]>([]);
   const [rightWires, setRightWires] = useState<WirePoint[]>([]);
@@ -31,19 +31,37 @@ const WireFixGame: React.FC = () => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [status, setStatus] = useState<"playing" | "won" | "lost">("playing");
   const [errorCount, setErrorCount] = useState(0);
-  const [isGlitched, setIsGlitched] = useState(false);
-  const maxErrors = 3;
+  const [erroredNodes, setErroredNodes] = useState<{
+    left: number | null;
+    right: number | null;
+  }>({ left: null, right: null });
+
+  // Difficulty parameters
+  const wireCount = gameParams.wireCount || 6;
+  const shuffleSpeed = gameParams.shuffleSpeed || 5000;
+  const maxErrors = gameParams.maxMistakes || 3;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const leftRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
   const rightRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
 
-  const successSound = useRef(new Audio("./assets/success.ogg"));
-  const failedSound = useRef(new Audio("./assets/failed.ogg"));
-  const connectSound = useRef(new Audio("./assets/hover.ogg"));
+  const successSound = useRef<HTMLAudioElement | null>(null);
+  const failedSound = useRef<HTMLAudioElement | null>(null);
+  const connectSound = useRef<HTMLAudioElement | null>(null);
+  const errorSound = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    const baseWires = COLORS.map((c, i) => ({ ...c, id: i }));
+    successSound.current = new Audio("assets/success.ogg");
+    failedSound.current = new Audio("assets/failed.ogg");
+    connectSound.current = new Audio("assets/hover.ogg");
+    errorSound.current = new Audio("assets/error.ogg");
+  }, []);
+
+  useEffect(() => {
+    const baseWires = COLORS.slice(0, wireCount).map((c, i) => ({
+      ...c,
+      id: i,
+    }));
     setLeftWires(
       [...baseWires]
         .sort(() => Math.random() - 0.5)
@@ -70,7 +88,7 @@ const WireFixGame: React.FC = () => {
       if (status === "playing") {
         setRightWires((prev) => [...prev].sort(() => Math.random() - 0.5));
       }
-    }, SHUFFLE_INTERVAL);
+    }, shuffleSpeed);
 
     return () => {
       clearInterval(interval);
@@ -81,17 +99,17 @@ const WireFixGame: React.FC = () => {
   const handleLose = () => {
     if (status !== "playing") return;
     setStatus("lost");
-    failedSound.current.play().catch(() => {});
+    failedSound.current?.play().catch(() => {});
     fetchNui("hackingEnd", { outcome: false, sessionId });
-    setTimeout(closeGame, 1000);
+    setTimeout(closeGame, 2500);
   };
 
   const handleWin = () => {
     if (status !== "playing") return;
     setStatus("won");
-    successSound.current.play().catch(() => {});
+    successSound.current?.play().catch(() => {});
     fetchNui("hackingEnd", { outcome: true, sessionId });
-    setTimeout(closeGame, 1000);
+    setTimeout(closeGame, 2500);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -104,8 +122,10 @@ const WireFixGame: React.FC = () => {
   const startDrag = (id: number) => {
     if (status !== "playing" || connections[id] !== undefined) return;
     setDraggingWireId(id);
-    connectSound.current.currentTime = 0;
-    connectSound.current.play().catch(() => {});
+    if (connectSound.current) {
+      connectSound.current.currentTime = 0;
+      connectSound.current.play().catch(() => {});
+    }
   };
 
   const endDrag = (targetId: number, targetColor: string) => {
@@ -116,11 +136,13 @@ const WireFixGame: React.FC = () => {
           // Successfull connection
           setConnections((prev) => {
             const newConn = { ...prev, [draggingWireId]: targetId };
-            if (Object.keys(newConn).length === COLORS.length) handleWin();
+            if (Object.keys(newConn).length === wireCount) handleWin();
             return newConn;
           });
-          connectSound.current.currentTime = 0;
-          connectSound.current.play().catch(() => {});
+          if (connectSound.current) {
+            connectSound.current.currentTime = 0;
+            connectSound.current.play().catch(() => {});
+          }
         } else {
           // Wrong connection
           setErrorCount((prev) => {
@@ -129,11 +151,13 @@ const WireFixGame: React.FC = () => {
             return next;
           });
 
-          // Visual Feedback
-          setIsGlitched(true);
-          failedSound.current.currentTime = 0;
-          failedSound.current.play().catch(() => {});
-          setTimeout(() => setIsGlitched(false), 300);
+          // Visual Feedback - Localized Shake
+          setErroredNodes({ left: draggingWireId, right: targetId });
+          if (errorSound.current) {
+            errorSound.current.currentTime = 0;
+            errorSound.current.play().catch(() => {});
+          }
+          setTimeout(() => setErroredNodes({ left: null, right: null }), 500);
         }
       }
     }
@@ -155,25 +179,50 @@ const WireFixGame: React.FC = () => {
     return { x: 0, y: 0 };
   };
 
+  const isErrorActive =
+    erroredNodes.left !== null || erroredNodes.right !== null;
+
   return (
     <div
-      className={`wirefix-wrapper ${isGlitched ? "glitch-shake" : ""}`}
+      className="wirefix-wrapper"
       onMouseMove={handleMouseMove}
       onMouseUp={() => setDraggingWireId(null)}
     >
-      <img
-        src="assets/laptop-frame.svg"
-        alt="Laptop Frame"
-        className="laptop-frame-img"
-      />
-
-      <div
-        className={`wirefix-container crt-effect ${status !== "playing" ? "vignette" : ""}`}
+      <motion.div
+        className="wirefix-laptop-frame"
+        initial={{ opacity: 0, scale: 0.9, rotateX: 20, y: 50 }}
+        animate={{ opacity: 1, scale: 1, rotateX: 0, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, rotateX: 10, y: -20 }}
+        transition={{
+          type: "spring",
+          stiffness: 260,
+          damping: 20,
+        }}
       >
-        <div className="wirefix-header">
-          <div className="header-left">
-            <span className="wirefix-title">NEURAL LINK RESTORATION</span>
-            <div className="error-panel">
+        <img
+          src="assets/laptop-frame.svg"
+          alt="Laptop Frame"
+          className="laptop-frame-img"
+        />
+
+        <div
+          className={`wirefix-container crt-effect ${isErrorActive ? "glitch-shake" : ""}`}
+        >
+          <div className="wirefix-header">
+            <div className="header-left">
+              <h2 className="panel-title">
+                {wireLocale.title || "NEURAL LINK RESTORATION"}
+              </h2>
+              <div className="status-badge">
+                {status === "playing" ? "ANALYZING_NODES..." : "SESSION_END"}
+              </div>
+            </div>
+
+            <div className={`wirefix-timer ${timeLeft < 5 ? "critical" : ""}`}>
+              {timeLeft}s
+            </div>
+
+            <div className="error-panel" style={{ justifySelf: "end" }}>
               <span className="error-label">SIGNAL ERRORS:</span>
               <div className="error-dots">
                 {Array.from({ length: maxErrors }).map((_, i) => (
@@ -185,118 +234,141 @@ const WireFixGame: React.FC = () => {
               </div>
             </div>
           </div>
-          <span className={`wirefix-timer ${timeLeft < 5 ? "critical" : ""}`}>
-            {timeLeft}s
-          </span>
-        </div>
 
-        <div className="wirefix-board" ref={containerRef}>
-          <svg className="wire-canvas">
-            {Object.entries(connections).map(([leftId, rightId]) => {
-              const start = getCoords("left", parseInt(leftId));
-              const end = getCoords("right", rightId);
-              const color = leftWires.find(
-                (w) => w.id === parseInt(leftId),
-              )?.color;
-              return (
-                <motion.path
-                  key={leftId}
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={{ pathLength: 1, opacity: 1 }}
-                  d={`M ${start.x} ${start.y} C ${start.x + 80} ${start.y}, ${end.x - 80} ${end.y}, ${end.x} ${end.y}`}
-                  className="wire-path active"
-                  stroke={color}
+          <div className="wirefix-board" ref={containerRef}>
+            <svg className="wire-canvas">
+              {Object.entries(connections).map(([leftId, rightId]) => {
+                const start = getCoords("left", parseInt(leftId));
+                const end = getCoords("right", rightId);
+                const color = leftWires.find(
+                  (w) => w.id === parseInt(leftId),
+                )?.color;
+                return (
+                  <motion.path
+                    key={leftId}
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 1 }}
+                    d={`M ${start.x} ${start.y} C ${start.x + 80} ${start.y}, ${end.x - 80} ${end.y}, ${end.x} ${end.y}`}
+                    stroke={color}
+                    className="wire-path active"
+                  />
+                );
+              })}
+              {draggingWireId !== null && (
+                <path
+                  d={`M ${getCoords("left", draggingWireId).x} ${getCoords("left", draggingWireId).y} C ${getCoords("left", draggingWireId).x + 80} ${getCoords("left", draggingWireId).y}, ${mousePos.x - 40} ${mousePos.y}, ${mousePos.x} ${mousePos.y}`}
+                  className="wire-path dragging"
+                  stroke={leftWires.find((w) => w.id === draggingWireId)?.color}
                 />
-              );
-            })}
+              )}
+            </svg>
 
-            {draggingWireId !== null && (
-              <path
-                d={`M ${getCoords("left", draggingWireId).x} ${getCoords("left", draggingWireId).y} 
-                                C ${getCoords("left", draggingWireId).x + 80} ${getCoords("left", draggingWireId).y}, 
-                                  ${mousePos.x - 80} ${mousePos.y}, 
-                                  ${mousePos.x} ${mousePos.y}`}
-                className="wire-path dragging"
-                stroke={leftWires.find((w) => w.id === draggingWireId)?.color}
-              />
-            )}
-          </svg>
-
-          <div className="wire-column">
-            {leftWires.map((wire) => (
-              <motion.div
-                key={wire.id}
-                layout
-                ref={(el) => {
-                  leftRefs.current[wire.id] = el;
-                }}
-                className={`connector ${connections[wire.id] !== undefined ? "connected" : ""}`}
-                style={{ color: wire.color }}
-                onMouseDown={() => startDrag(wire.id)}
-              />
-            ))}
-          </div>
-
-          <div className="wire-column">
-            <AnimatePresence mode="popLayout">
-              {rightWires.map((wire) => (
-                <motion.div
+            <div className="wire-column">
+              {leftWires.map((wire) => (
+                <div
                   key={wire.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 400,
-                    damping: 30,
-                    mass: 1,
-                  }}
                   ref={(el) => {
-                    rightRefs.current[wire.id] = el;
+                    leftRefs.current[wire.id] = el;
                   }}
-                  className={`connector ${Object.values(connections).includes(wire.id) ? "connected" : ""}`}
+                  className={`connector ${connections[wire.id] !== undefined ? "connected" : ""} ${erroredNodes.left === wire.id ? "node-error-shake" : ""}`}
                   style={{ color: wire.color }}
-                  onMouseUp={() => endDrag(wire.id, wire.color)}
-                />
+                  onMouseDown={() => startDrag(wire.id)}
+                >
+                  <svg className="node-svg" viewBox="0 0 100 100">
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="35"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="8"
+                      strokeDasharray="15 10"
+                    />
+                    <circle cx="50" cy="50" r="15" fill="currentColor" />
+                  </svg>
+                </div>
               ))}
-            </AnimatePresence>
+            </div>
+
+            <div className="wire-column">
+              <AnimatePresence mode="popLayout">
+                {rightWires.map((wire) => (
+                  <motion.div
+                    key={wire.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 30,
+                      mass: 1,
+                    }}
+                    ref={(el) => {
+                      rightRefs.current[wire.id] = el;
+                    }}
+                    className={`connector ${Object.values(connections).includes(wire.id) ? "connected" : ""} ${erroredNodes.right === wire.id ? "node-error-shake" : ""}`}
+                    style={{ color: wire.color }}
+                    onMouseUp={() => endDrag(wire.id, wire.color)}
+                  >
+                    <svg className="node-svg" viewBox="0 0 100 100">
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="35"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                      />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                    </svg>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
           </div>
 
-          <div className="warning-text">
-            CAUTION: NEURAL SYNC UNSTABLE. PORTS ARE SHIFTING.
-          </div>
+          <p className="warning-text">
+            {wireLocale.warning_text || "VOLTAGE CRITICAL - ALIGN NEURAL PATHS"}
+          </p>
 
-          {/* Win/Loss Overlays */}
           <AnimatePresence>
-            {status !== "playing" && (
+            {(status === "won" || status === "lost") && (
               <motion.div
+                className="wirefix-status-overlay"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="game-status-overlay"
               >
-                <motion.span
-                  initial={{ scale: 0.5, y: 20 }}
+                <motion.div
+                  className={`wirefix-status-card ${status}`}
+                  initial={{ scale: 0.8, y: 20 }}
                   animate={{ scale: 1, y: 0 }}
-                  className={`status-text ${status}`}
                 >
-                  {status === "won" ? "LINK ESTABLISHED" : "NEURAL COLLAPSE"}
-                </motion.span>
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                  className="status-subtitle"
-                >
-                  {status === "won"
-                    ? "SYSTEMS STABILIZED"
-                    : "CONNECTION TERMINATED"}
-                </motion.span>
+                  <h1>
+                    {status === "won"
+                      ? wireLocale.success_title || "LINK ESTABLISHED"
+                      : wireLocale.fail_title || "SYSTEM CRITICAL"}
+                  </h1>
+                  <p>
+                    {status === "won"
+                      ? wireLocale.success_desc ||
+                        "NEURAL CONNECTION SUCCESSFUL"
+                      : wireLocale.fail_desc || "CONNECTION TERMINATED BY HOST"}
+                  </p>
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

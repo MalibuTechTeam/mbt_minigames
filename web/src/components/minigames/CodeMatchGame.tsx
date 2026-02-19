@@ -1,23 +1,48 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useMinigameStore } from "../../store/useMinigameStore";
 import { fetchNui } from "../../utils/fetchNui";
+import { motion, AnimatePresence } from "framer-motion";
 import "./CodeMatchGame.css";
 
 const CHARS = "ABCDEF0123456789";
 const STREAM_SIZE = 20;
 
 const CodeMatchGame: React.FC = () => {
-  const { timeLimit, sessionId, closeGame } = useMinigameStore();
+  const { timeLimit, sessionId, closeGame, gameParams, locale } =
+    useMinigameStore();
+  const codeLocale = locale?.code_match || {};
   const [timeLeft, setTimeLeft] = useState(timeLimit || 30);
+
+  // Sync timeLeft when timeLimit from store changes
+  useEffect(() => {
+    if (timeLimit > 0) {
+      setTimeLeft(timeLimit);
+    }
+  }, [timeLimit]);
   const [targetCode, setTargetCode] = useState("");
   const [stream, setStream] = useState<string[]>([]);
   const [score, setScore] = useState(0);
   const [status, setStatus] = useState<"playing" | "won" | "lost">("playing");
+  const [isError, setIsError] = useState(false);
+  const [mistakes, setMistakes] = useState(0);
+
+  // Difficulty parameters
+  const segmentCount = gameParams.segmentCount || 5;
+  const maxMistakes = gameParams.maxMistakes || 3;
+  const shiftSpeed = gameParams.shiftSpeed || 800; // ms
 
   // Refs for audio
-  const findSound = useRef(new Audio("./assets/success.ogg"));
-  const errorSound = useRef(new Audio("./assets/failed.ogg"));
-  const winSound = useRef(new Audio("./assets/success.ogg"));
+  const findSound = useRef<HTMLAudioElement | null>(null);
+  const errorSound = useRef<HTMLAudioElement | null>(null);
+  const winSound = useRef<HTMLAudioElement | null>(null);
+  const loseSound = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    findSound.current = new Audio("assets/success.ogg");
+    errorSound.current = new Audio("assets/error.ogg");
+    winSound.current = new Audio("assets/success.ogg");
+    loseSound.current = new Audio("assets/failed.ogg");
+  }, []);
 
   const generateCode = () => {
     let code = "";
@@ -48,151 +73,220 @@ const CodeMatchGame: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Stream mechanics
+  const targetCodeRef = useRef(targetCode);
   useEffect(() => {
-    if (status !== "playing") return;
-
-    const streamInterval = setInterval(() => {
-      setStream((prev) => {
-        const next = [...prev];
-        next.pop(); // Remove last
-        next.unshift(generateCode()); // Add new to top
-
-        // Ensure target is present in stream occasionally if missing
-        if (!next.includes(targetCode) && Math.random() > 0.7) {
-          next[0] = targetCode;
-        }
-        return next;
-      });
-    }, 800); // Speed of stream
-
-    return () => clearInterval(streamInterval);
-  }, [status, targetCode]);
+    targetCodeRef.current = targetCode;
+  }, [targetCode]);
 
   const handleItemClick = (code: string) => {
     if (status !== "playing") return;
 
     if (code === targetCode) {
       // Correct click
-      findSound.current.currentTime = 0;
-      findSound.current.play().catch(() => {});
+      if (findSound.current) {
+        findSound.current.currentTime = 0;
+        findSound.current.play().catch(() => {});
+      }
 
       const newScore = score + 1;
       setScore(newScore);
 
-      if (newScore >= 5) {
+      if (newScore >= segmentCount) {
         handleEnd(true);
       } else {
-        setTargetCode(generateCode());
-        // Force new target into stream near top
+        const nextTarget = generateCode();
+        setTargetCode(nextTarget);
+        // Inject between 3 and 7 to avoid immediate appearance or too much delay
         setStream((prev) => {
           const next = [...prev];
-          next[0] = targetCode; // Note: targetCode ref might be old state here, but next render fixes it?
-          // Actually setTargetCode is async. checking logic:
-          // Better: pick a new target from EXISTING stream or GENERATE new.
-          // Let's generate new target.
+          const randomIndex = Math.floor(Math.random() * 5) + 3;
+          if (randomIndex < next.length) {
+            next[randomIndex] = nextTarget;
+          }
           return next;
         });
       }
     } else {
       // Wrong click
-      errorSound.current.currentTime = 0;
-      errorSound.current.play().catch(() => {});
-      setTimeLeft((prev) => Math.max(0, prev - 2)); // Penalty
+      setIsError(true);
+      if (errorSound.current) {
+        errorSound.current.currentTime = 0;
+        errorSound.current.play().catch(() => {});
+      }
+
+      const newMistakes = mistakes + 1;
+      setMistakes(newMistakes);
+
+      if (newMistakes >= maxMistakes) {
+        handleEnd(false);
+      } else {
+        setTimeLeft((prev) => Math.max(0, prev - 2)); // Penalty
+        setTimeout(() => setIsError(false), 500);
+      }
     }
   };
 
   const handleEnd = (win: boolean) => {
     setStatus(win ? "won" : "lost");
-    if (win) winSound.current.play().catch(() => {});
-    else errorSound.current.play().catch(() => {});
+    if (win) {
+      winSound.current?.play().catch(() => {});
+    } else {
+      loseSound.current?.play().catch(() => {});
+    }
 
     fetchNui("hackingEnd", { outcome: win, sessionId });
-    setTimeout(closeGame, 1500);
+    setTimeout(closeGame, 2500);
   };
 
   return (
-    <div
-      className="codematch-wrapper"
-      style={{
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "90vw" /* Responsive width */,
-        maxHeight: "90vh",
-        aspectRatio: "1920 / 1080" /* Enforce laptop aspect ratio */,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <img
-        src="assets/laptop-frame.svg"
-        alt="Laptop Frame"
-        className="laptop-frame-img"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          zIndex: 0,
-          pointerEvents: "none",
-          objectFit: "contain",
-        }}
-      />
-
-      <div
-        className="codematch-container crt-effect"
-        style={{
-          transform: "none",
-          position: "absolute",
-          zIndex: 1,
-          borderRadius: "2px",
-          /* Refined coordinates closer to HackingGame reference */
-          top: "8.1%",
-          left: "18.3%",
-          width: "63.2%",
-          height: "69.5%",
-          boxSizing: "border-box",
-          display: "flex",
-          flexDirection: "column",
-          padding: "2vmin",
+    <div className="codematch-wrapper">
+      <motion.div
+        className="codematch-laptop-frame"
+        initial={{ opacity: 0, scale: 0.9, rotateX: 20, y: 50 }}
+        animate={{ opacity: 1, scale: 1, rotateX: 0, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, rotateX: 10, y: -20 }}
+        transition={{
+          type: "spring",
+          stiffness: 260,
+          damping: 20,
         }}
       >
-        <div className="codematch-header">
-          <span>DATA STREAM SYNC</span>
-          <span>TIME: {timeLeft}s</span>
-        </div>
+        <img
+          src="assets/laptop-frame.svg"
+          alt="Laptop Frame"
+          className="laptop-frame-img"
+        />
 
-        <div className="target-display">
-          <span className="target-label">LOCATE SEQUENCE</span>
-          <span
-            className="target-text neon-text-green"
-            style={{ fontSize: "2.5rem", letterSpacing: "8px" }}
+        <div className="codematch-container crt-effect">
+          <div
+            className={`codematch-content-shaker ${isError ? "flash-error" : ""}`}
           >
-            {targetCode}
-          </span>
-        </div>
-
-        <div className="stream-area">
-          <div className="scanline-bar"></div>
-          <div className="stream-column">
-            {stream.map((code, idx) => (
-              <div
-                key={`${code}-${idx}`}
-                className="stream-item"
-                onMouseDown={() => handleItemClick(code)}
-              >
-                {code}
+            <div className="codematch-header">
+              <div className="header-side header-left">
+                <span>{codeLocale.title || "NEURAL LINK DECRYPTION"}</span>
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="header-middle">
+                {codeLocale.sync_progress || "SYNC"}: {score}/{segmentCount}
+              </div>
+              <div className="header-side header-right">
+                <span
+                  style={{
+                    color: mistakes >= maxMistakes - 1 ? "#ff0066" : "inherit",
+                  }}
+                >
+                  ERRORS: {mistakes}/{maxMistakes}
+                </span>
+                <span style={{ marginLeft: "2vmin" }}>TIME: {timeLeft}s</span>
+              </div>
+            </div>
 
-        <div className="score-display">SYNC: {score}/5</div>
-      </div>
+            <div className="target-display">
+              <span className="target-label">
+                {codeLocale.locate || "IDENTIFY SEQUENCE"}
+              </span>
+              <span className="target-text">{targetCode}</span>
+            </div>
+
+            <div className="stream-area">
+              <div className="scanline-bar"></div>
+              <motion.div
+                className="stream-column"
+                animate={
+                  status === "playing"
+                    ? {
+                        y: [0, -60], // Physical height of one item + gap (adjusted in CSS)
+                      }
+                    : {}
+                }
+                transition={{
+                  duration: shiftSpeed / 1000,
+                  ease: "linear",
+                  repeat: Infinity,
+                }}
+                onUpdate={() => {
+                  // When we reach the end of one item's movement, rotate the stream array
+                  // actually doing it here is tricky. Better to keep it simple:
+                  // We'll use a larger buffer and just let it scroll.
+                  // Alternative: The old logic was "static" because of how unshift worked.
+                }}
+                onAnimationIteration={() => {
+                  // Loop the array
+                  setStream((prev) => {
+                    const next = [...prev];
+                    next.shift(); // Remove top
+                    const newCode = generateCode();
+                    next.push(newCode); // Add new at bottom
+
+                    // Use Ref to avoid stale closure of targetCode
+                    const currentTarget = targetCodeRef.current;
+
+                    // Guarantee target stays in pool if missing
+                    if (!next.includes(currentTarget)) {
+                      // Inject it somewhere in the middle (5-10) to make it appear eventually
+                      next[Math.floor(Math.random() * 5) + 6] = currentTarget;
+                    }
+                    return next;
+                  });
+                }}
+              >
+                {stream.map((code, idx) => (
+                  <div
+                    key={`${code}-${idx}`}
+                    className="stream-item"
+                    onMouseDown={() => handleItemClick(code)}
+                  >
+                    <span className="memory-addr">
+                      0x{((idx + 1) * 0x4f2a).toString(16).toUpperCase()}
+                    </span>
+                    <span className="code-val">{code || "----"}</span>
+                  </div>
+                ))}
+              </motion.div>
+            </div>
+          </div>
+
+          <AnimatePresence>
+            {status !== "playing" && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="codematch-status-overlay"
+              >
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className={`codematch-status-card ${status}`}
+                >
+                  <h1>
+                    {status === "won"
+                      ? codeLocale.won || "SYNC COMPLETE"
+                      : codeLocale.lost || "SYNC FAILED"}
+                  </h1>
+                  <div className="status-neural-bar">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 1.5 }}
+                      className="neural-fill"
+                    />
+                  </div>
+                  <p
+                    style={{
+                      marginTop: "2vmin",
+                      fontSize: "1.2vmin",
+                      opacity: 0.6,
+                    }}
+                  >
+                    {status === "won"
+                      ? "TERMINAL ACCESS GRANTED"
+                      : "CONNECTION TERMINATED"}
+                  </p>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
     </div>
   );
 };

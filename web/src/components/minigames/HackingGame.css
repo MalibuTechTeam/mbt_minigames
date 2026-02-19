@@ -214,7 +214,7 @@
     display: grid;
     /* Explicitly define rows and ensure container height is respected */
     grid-template-columns: repeat(8, 1fr);
-    grid-template-rows: repeat(7, 1fr);
+    grid-template-rows: repeat(8, 1fr);
     gap: 0.4vmin;
     padding: 0.5vmin;
     background: rgba(0, 20, 40, 0.5);

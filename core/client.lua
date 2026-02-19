@@ -1,27 +1,28 @@
 local session = {}
 local bh = false
 
--- Global table initialization (Fallback if config.lua fails to load)
-MBT = MBT or {}
-if not MBT.Minigames then
-    print("[mbt_minigames] Initializing default configuration fallback.")
-    MBT.Minigames = {
-        ['hacking'] = { time = 30 },
-        ['wire_fix'] = { time = 25 },
-        ['bolt_turn'] = { time = 25 },
-        ['code_match'] = { time = 20 }
-    }
+Utils = {}
+
+function Utils.MbtDebugger(...)
+    if MBT.Debug then
+        local arg = { ... }
+        local printResult = "[" .. GetCurrentResourceName() .. "] | "
+        for _, v in ipairs(arg) do
+            printResult = printResult .. tostring(v) .. "\t"
+        end
+        printResult = printResult .. "\n"
+        print(printResult)
+    end
 end
 
 -- Debug: Check if config loaded
 Citizen.CreateThread(function()
     Wait(1000)
-    if MBT and MBT.Minigames then
-        print("[mbt_minigames] Current BoltTurn Time: " ..
-            (MBT.Minigames['bolt_turn'] and MBT.Minigames['bolt_turn'].time or "N/A"))
-        print("[mbt_minigames] Configuration loaded successfully.")
+    if MBT and MBT.Locale then
+        Utils.MbtDebugger("Locale system and Difficulty profiles loaded.")
+        Utils.MbtDebugger("Configuration loaded successfully.")
     else
-        print("[mbt_minigames] ^1ERROR: Configuration table 'MBT' not found!^7")
+        Utils.MbtDebugger("^1ERROR: Configuration table 'MBT.Locale' not found!^7")
     end
 end)
 
@@ -118,21 +119,31 @@ local function startHackingSession(data)
     NetworkStopSynchronisedScene(netScene)
     NetworkStartSynchronisedScene(netScene2)
 
-    local timeLimit = data.Time or data.time
-    if not timeLimit then
-        if MBT and MBT.Minigames and MBT.Minigames['hacking'] then
-            timeLimit = MBT.Minigames['hacking'].time
-        else
-            timeLimit = 30
-        end
-    end
+    -- Difficulty & Parameter Resolution
+    local diffRaw = data.difficulty or data.Difficulty or MBT.DefaultDifficulty or "Easy"
+    local diff = string.upper(string.sub(diffRaw, 1, 1)) .. string.lower(string.sub(diffRaw, 2))
+
+    local configParams = (MBT.Difficulties and MBT.Difficulties[diff] and MBT.Difficulties[diff]['hacking']) or {}
+
+    local timeLimit = data.Time or data.time or configParams.time or 30
+
+    -- Merge parameters (Caller override > Config difficulty > Defaults)
+    local finalParams = {}
+    for k, v in pairs(configParams) do finalParams[k] = v end
+    local extraParams = data.params or data.Params or {}
+    for k, v in pairs(extraParams) do finalParams[k] = v end
+
+    Utils.MbtDebugger("Starting Hacking Session | Diff: " .. diff .. " | Time: " .. timeLimit)
 
     SendNUI({
         Action = "handleUI",
         Status = true,
         Payload = {
             Id = sessionId,
-            TimeLimit = timeLimit
+            Type = "hacking",
+            TimeLimit = timeLimit,
+            Params = finalParams,
+            Locale = MBT.Locale
         }
     })
 
@@ -168,14 +179,15 @@ local function startRepairSession(data)
 
     local ped = PlayerPedId()
     local pedCoords = GetEntityCoords(ped)
-    local time = data.time or data.Time
-    if not time then
-        if MBT and MBT.Minigames and MBT.Minigames[type] then
-            time = MBT.Minigames[type].time
-        else
-            time = 30
-        end
-    end
+    local type = data.type or "hacking"
+
+    -- Difficulty & Parameter Resolution
+    local diffRaw = data.difficulty or data.Difficulty or MBT.DefaultDifficulty or "Easy"
+    local diff = string.upper(string.sub(diffRaw, 1, 1)) .. string.lower(string.sub(diffRaw, 2))
+
+    local configParams = (MBT.Difficulties and MBT.Difficulties[diff] and MBT.Difficulties[diff][type]) or {}
+
+    local time = data.time or data.Time or configParams.time or 30
 
     if type == "hacking" then
         return startHackingSession(data) -- Keep original complex animation for hacking
@@ -217,13 +229,23 @@ local function startRepairSession(data)
     end
     FreezeEntityPosition(ped, true)
 
+    -- Merge parameters (Caller override > Config difficulty > Defaults)
+    local finalParams = {}
+    for k, v in pairs(configParams) do finalParams[k] = v end
+    local extraParams = data.params or data.Params or {}
+    for k, v in pairs(extraParams) do finalParams[k] = v end
+
+    Utils.MbtDebugger("Starting Repair Session | Type: " .. type .. " | Diff: " .. diff .. " | Time: " .. time)
+
     SendNUI({
         Action = "handleUI",
         Status = true,
         Payload = {
             Id = sessionId,
             Type = type,
-            TimeLimit = time
+            TimeLimit = time,
+            Params = finalParams,
+            Locale = MBT.Locale
         }
     })
 
@@ -277,3 +299,15 @@ end)
 exports('startRepairSession', function(data)
     return startRepairSession(data)
 end)
+
+-- Debug Command
+RegisterCommand("testminigame", function(source, args)
+    local type = args[1] or "code_match"
+    local diff = args[2] or "Easy"
+    Utils.MbtDebugger("Debug Command: Testing " .. type .. " on " .. diff)
+    local outcome = startRepairSession({
+        type = type,
+        difficulty = diff
+    })
+    Utils.MbtDebugger("Debug Result: " .. tostring(outcome))
+end, false)
