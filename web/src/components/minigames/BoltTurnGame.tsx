@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useMinigameStore } from "../../store/useMinigameStore";
 import { fetchNui } from "../../utils/fetchNui";
 import { motion, AnimatePresence } from "framer-motion";
 import "./BoltTurnGame.css";
 
-const MAX_HEAT = 100;
-const HEAT_DECAY = 40; // per second
-// const HEAT_GAIN = 15; // Unused in new logic
-const OVERHEAT_PENALTY = 2000; // ms to wait if overheated
+// --- Torque Physics Constants ---
+const TENSION_BUILD_RATE = 120; // Tension units per second when held
+const TENSION_DECAY_RATE = 180; // Tension units per second when released
+const MAX_TENSION = 100;
+const SWEET_SPOT_WIDTH = 25; // 25% of the dial
+const OVERHEAT_PENALTY_MS = 2000;
+const PROGRESS_BUILD_RATE = 15; // Progress per second while in sweet spot
 
 const CurvedGauge: React.FC<{ value: number; label: string }> = ({
   value,
@@ -28,7 +31,7 @@ const CurvedGauge: React.FC<{ value: number; label: string }> = ({
           className="gauge-fill"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          style={{ stroke: value > 80 ? "#ff3366" : "#ff9d00" }}
+          style={{ stroke: value > 80 ? "#ff3366" : "#00f2ff" }} // Adjusted to core theme
         />
       </svg>
       <div
@@ -42,7 +45,7 @@ const CurvedGauge: React.FC<{ value: number; label: string }> = ({
       >
         <span
           className="stability-value"
-          style={{ color: value > 80 ? "#ff3366" : "#ff9d00" }}
+          style={{ color: value > 80 ? "#ff3366" : "#00f2ff" }}
         >
           {Math.round(value)}%
         </span>
@@ -53,31 +56,39 @@ const CurvedGauge: React.FC<{ value: number; label: string }> = ({
 };
 
 const BoltTurnGame: React.FC = () => {
-  const { timeLimit, sessionId, closeGame, gameParams, locale } =
+  const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
     useMinigameStore();
   const boltLocale = locale?.bolt_turn || {};
-  const [timeLeft, setTimeLeft] = useState(timeLimit || 25);
+  const initialTimeLimit = useRef(
+    gameParams.timeLimit || timeLimit || 45,
+  ).current;
+  const [timeLeft, setTimeLeft] = useState(initialTimeLimit);
 
   // Difficulty parameters
-  const boltCount = gameParams.boltCount || 3;
-  const heatSpeed = gameParams.heatSpeed || 1.0;
+  const boltCount = gameParams.boltCount || 4;
+  const heatSpeed = gameParams.heatSpeed || 1.0; // Acts as sweetspot erraticism multiplier
   const maxErrors = gameParams.maxMistakes || 3;
 
-  const [boltProgress, setBoltProgress] = useState(
+  const [boltProgress, setBoltProgress] = useState<number[]>(
     new Array(boltCount).fill(0),
   );
-  const [boltHeat, setBoltHeat] = useState(new Array(boltCount).fill(0));
-  const [overheated, setOverheated] = useState(
+  const [overheated, setOverheated] = useState<boolean[]>(
     new Array(boltCount).fill(false),
   );
-  const [glitchedValves, setGlitchedValves] = useState(
+  const [glitchedValves, setGlitchedValves] = useState<boolean[]>(
     new Array(boltCount).fill(false),
   );
+
   const [status, setStatus] = useState<"playing" | "won" | "lost">("playing");
   const [activeValve, setActiveValve] = useState<number | null>(null);
-  const [heatErrors, setHeatErrors] = useState(0);
+  const [mistakes, setMistakes] = useState(0);
   const [errorLog, setErrorLog] = useState<string[]>([]);
-  const holdInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // High-performance physics state (Bypassing React Renders)
+  const tensionRefs = useRef<number[]>(new Array(boltCount).fill(0));
+  const overheatedRef = useRef<boolean[]>(new Array(boltCount).fill(false));
+  const reqRef = useRef<number>(undefined);
+  const lastTimeRef = useRef<number>(undefined);
 
   const successSound = useRef<HTMLAudioElement | null>(null);
   const failedSound = useRef<HTMLAudioElement | null>(null);
@@ -89,45 +100,262 @@ const BoltTurnGame: React.FC = () => {
     failedSound.current = new Audio("assets/failed.ogg");
     turnSound.current = new Audio("assets/hover.ogg");
     errorSound.current = new Audio("assets/error.ogg");
+
+    return () => {
+      if (turnSound.current) {
+        turnSound.current.pause();
+        turnSound.current = null;
+      }
+      if (successSound.current) successSound.current.pause();
+      if (failedSound.current) failedSound.current.pause();
+      if (errorSound.current) errorSound.current.pause();
+    };
   }, []);
 
+  // Timer
   useEffect(() => {
+    if (status !== "playing") return;
     const timerInterval = setInterval(() => {
-      if (status !== "playing") return;
-      setTimeLeft((prev) => {
+      setTimeLeft((prev: number) => {
         if (prev <= 1) {
-          handleLose();
+          handleEnd(false);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
+    return () => clearInterval(timerInterval);
+  }, [status]);
 
-    const heatInterval = setInterval(() => {
-      setBoltHeat((prev) => prev.map((h) => Math.max(0, h - HEAT_DECAY / 10)));
-    }, 100);
+  const handleEnd = (win: boolean) => {
+    if (status !== "playing") return;
+    setStatus(win ? "won" : "lost");
+
+    // Stop any looping sounds immediately
+    if (turnSound.current) {
+      turnSound.current.pause();
+      turnSound.current.currentTime = 0;
+    }
+
+    if (win) {
+      successSound.current?.play().catch(() => {});
+    } else {
+      failedSound.current?.play().catch(() => {});
+    }
+    fetchNui("hackingEnd", { outcome: win, sessionId });
+    setTimeout(closeGame, 2500);
+  };
+
+  const triggerOverheat = useCallback(
+    (index: number) => {
+      if (overheatedRef.current[index]) return;
+      overheatedRef.current[index] = true;
+
+      setOverheated((prev) => {
+        const next = [...prev];
+        next[index] = true;
+        return next;
+      });
+
+      // Drop tension back to 0 instantly when stripped
+      tensionRefs.current[index] = 0;
+      setActiveValve(null);
+
+      setMistakes((prevM) => {
+        const next = prevM + 1;
+        if (next >= maxErrors) {
+          handleEnd(false);
+        }
+        return next;
+      });
+
+      setErrorLog((prevLogs) => [
+        (
+          boltLocale.log_overheat || "TORQUE OVERLOAD: BOLT #%s STRIPPED"
+        ).replace("%s", (index + 1).toString()),
+        ...prevLogs.slice(0, 4),
+      ]);
+
+      setGlitchedValves((prev) => {
+        const next = [...prev];
+        next[index] = true;
+        return next;
+      });
+
+      setTimeout(() => {
+        setGlitchedValves((prev) => {
+          const next = [...prev];
+          next[index] = false;
+          return next;
+        });
+      }, 500);
+
+      if (errorSound.current) {
+        errorSound.current.currentTime = 0;
+        errorSound.current.play().catch(() => {});
+      }
+
+      setTimeout(() => {
+        if (status !== "playing") return;
+        overheatedRef.current[index] = false;
+        setOverheated((prev) => {
+          const restored = [...prev];
+          restored[index] = false;
+          return restored;
+        });
+        setErrorLog((prevLogs) => [
+          (
+            boltLocale.log_restored || "THREADS SECURED: BOLT #%s READY"
+          ).replace("%s", (index + 1).toString()),
+          ...prevLogs.slice(0, 4),
+        ]);
+      }, OVERHEAT_PENALTY_MS);
+    },
+    [maxErrors, boltLocale, status],
+  );
+
+  // Main Physics Loop
+  useEffect(() => {
+    if (status !== "playing") return;
+
+    const animate = (time: DOMHighResTimeStamp) => {
+      if (lastTimeRef.current === undefined) lastTimeRef.current = time;
+      const deltaTime = (time - lastTimeRef.current) / 1000; // in seconds
+      lastTimeRef.current = time;
+
+      // Calculate the shared shifting sweet spot center based on time and difficulty
+      // Using a sine wave combination to make it erratic but smooth
+      // Shifts between 20% and 80% tension
+      const speedMult = 0.5 * heatSpeed;
+      const baseSin = Math.sin(time * 0.001 * speedMult);
+      const secondarySin = Math.sin(time * 0.0023 * speedMult);
+      const sweetSpotCenter = 50 + baseSin * 20 + secondarySin * 10;
+
+      const ssMin = sweetSpotCenter - SWEET_SPOT_WIDTH / 2;
+      const ssMax = sweetSpotCenter + SWEET_SPOT_WIDTH / 2;
+
+      // Loop over all bolts to update their tension physics
+      for (let i = 0; i < boltCount; i++) {
+        const active = activeValve === i;
+        let currentTension = tensionRefs.current[i];
+        const isOH = overheatedRef.current[i];
+
+        if (!isOH && boltProgress[i] < 100) {
+          if (active) {
+            currentTension += TENSION_BUILD_RATE * deltaTime;
+          } else {
+            currentTension -= TENSION_DECAY_RATE * deltaTime;
+          }
+        }
+
+        currentTension = Math.max(0, currentTension);
+
+        if (currentTension >= MAX_TENSION && !isOH && boltProgress[i] < 100) {
+          currentTension = MAX_TENSION;
+          triggerOverheat(i);
+        }
+
+        tensionRefs.current[i] = currentTension;
+
+        // Visual updates via DOM to avoid React GC stutters
+        const needleEl = document.getElementById(`needle-${i}`);
+        const arcEl = document.getElementById(`sweet-arc-${i}`);
+        const tensionTextEl = document.getElementById(`tension-text-${i}`);
+
+        if (needleEl) {
+          // Tension maps to 283 stroke-dasharray (full circle)
+          const needleOffset = 283 - (283 * currentTension) / 100;
+          needleEl.style.strokeDashoffset = needleOffset.toString();
+
+          if (currentTension > ssMax) {
+            needleEl.style.stroke = "#ff3366"; // Too much force!
+          } else if (currentTension >= ssMin && currentTension <= ssMax) {
+            needleEl.style.stroke = "#39ff14"; // Perfect
+          } else {
+            needleEl.style.stroke = "#00f2ff"; // Too little force
+          }
+        }
+
+        if (arcEl) {
+          // Sweet spot arc visual mapping
+          // Arc is drawn based on dasharray, we can map it roughly by rotating the SVG
+          const ssWidthPct = SWEET_SPOT_WIDTH;
+          const mapToDash = (ssWidthPct / 100) * 283;
+          arcEl.style.strokeDasharray = `${mapToDash} 283`;
+
+          // Rotate the container to center the arc
+          // The arc starts at 0 (top/rotated to left), so we must offset it by ssMin
+          const rotationBase = -90; // Default SVG offset to top
+          const rotationAngle = rotationBase + (ssMin / 100) * 360;
+
+          const svgArcContainer = document.getElementById(`arc-container-${i}`);
+          if (svgArcContainer) {
+            svgArcContainer.style.transform = `rotate(${rotationAngle}deg)`;
+          }
+        }
+
+        if (tensionTextEl) {
+          tensionTextEl.textContent = `${Math.floor(currentTension)}%`;
+        }
+      }
+
+      reqRef.current = requestAnimationFrame(animate);
+    };
+    reqRef.current = requestAnimationFrame(animate);
 
     return () => {
-      clearInterval(timerInterval);
-      clearInterval(heatInterval);
+      if (reqRef.current) cancelAnimationFrame(reqRef.current);
     };
-  }, []);
+  }, [
+    status,
+    activeValve,
+    overheated,
+    boltCount,
+    heatSpeed,
+    boltProgress,
+    triggerOverheat,
+  ]);
 
-  const handleLose = () => {
+  // Progress Checking Loop (React-friendly, 20fps)
+  useEffect(() => {
     if (status !== "playing") return;
-    setStatus("lost");
-    failedSound.current?.play().catch(() => {});
-    fetchNui("hackingEnd", { outcome: false, sessionId });
-    setTimeout(closeGame, 2500);
-  };
+    const progressTimer = setInterval(() => {
+      setBoltProgress((prev) => {
+        const next = [...prev];
+        let hasChanged = false;
+        let allDone = true;
 
-  const handleWin = () => {
-    if (status !== "playing") return;
-    setStatus("won");
-    successSound.current?.play().catch(() => {});
-    fetchNui("hackingEnd", { outcome: true, sessionId });
-    setTimeout(closeGame, 2500);
-  };
+        const speedMult = 0.5 * heatSpeed;
+        const baseSin = Math.sin(performance.now() * 0.001 * speedMult);
+        const secondarySin = Math.sin(performance.now() * 0.0023 * speedMult);
+        const sweetSpotCenter = 50 + baseSin * 20 + secondarySin * 10;
+        const ssMin = sweetSpotCenter - SWEET_SPOT_WIDTH / 2;
+        const ssMax = sweetSpotCenter + SWEET_SPOT_WIDTH / 2;
+
+        for (let i = 0; i < boltCount; i++) {
+          if (next[i] >= 100 || overheatedRef.current[i]) continue;
+          allDone = false;
+
+          const active = activeValve === i;
+          if (active) {
+            const t = tensionRefs.current[i];
+            if (t >= ssMin && t <= ssMax) {
+              // Award progress
+              next[i] = Math.min(100, next[i] + PROGRESS_BUILD_RATE * 0.05); // 50ms tick
+              hasChanged = true;
+            }
+          }
+        }
+
+        if (allDone && boltCount > 0) {
+          handleEnd(true);
+        }
+        return hasChanged ? next : prev;
+      });
+    }, 50);
+
+    return () => clearInterval(progressTimer);
+  }, [status, activeValve, overheated, boltCount, heatSpeed]);
 
   const startTurning = (index: number) => {
     if (status !== "playing" || overheated[index] || boltProgress[index] >= 100)
@@ -149,99 +377,12 @@ const BoltTurnGame: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (activeValve !== null) {
-      holdInterval.current = setInterval(() => {
-        if (overheated[activeValve] || boltProgress[activeValve] >= 100) {
-          stopTurning();
-          return;
-        }
-
-        setBoltHeat((prev) => {
-          const nextHeat = [...prev];
-          nextHeat[activeValve] += 3.5 * heatSpeed; // Applied heat speed
-
-          if (nextHeat[activeValve] >= MAX_HEAT) {
-            const nextOverheated = [...overheated];
-            nextOverheated[activeValve] = true;
-            setOverheated(nextOverheated);
-            stopTurning();
-
-            setHeatErrors((prevMistakes) => {
-              const next = prevMistakes + 1;
-              if (next >= maxErrors) {
-                handleLose();
-              }
-              return next;
-            });
-
-            setErrorLog((prevLogs) => [
-              (
-                boltLocale.log_overheat ||
-                "CRITICAL OVERHEAT: VALVE #%s SHUTDOWN"
-              ).replace("%s", (activeValve + 1).toString()),
-              ...prevLogs.slice(0, 4),
-            ]);
-
-            // Local Visual & Audio Feedback
-            setGlitchedValves((prev) => {
-              const next = [...prev];
-              next[activeValve] = true;
-              return next;
-            });
-            setTimeout(() => {
-              setGlitchedValves((prev) => {
-                const next = [...prev];
-                next[activeValve] = false;
-                return next;
-              });
-            }, 500);
-
-            if (errorSound.current) {
-              errorSound.current.currentTime = 0;
-              errorSound.current.play().catch(() => {});
-            }
-
-            setTimeout(() => {
-              if (status !== "playing") return;
-              setOverheated((prevOH) => {
-                const restored = [...prevOH];
-                restored[activeValve] = false;
-                return restored;
-              });
-              setErrorLog((prevLogs) => [
-                (
-                  boltLocale.log_restored || "SYSTEM RESTORED: VALVE #%s ONLINE"
-                ).replace("%s", (activeValve + 1).toString()),
-                ...prevLogs.slice(0, 4),
-              ]);
-            }, OVERHEAT_PENALTY);
-          }
-          return nextHeat;
-        });
-
-        if (!overheated[activeValve]) {
-          setBoltProgress((prev) => {
-            const next = [...prev];
-            next[activeValve] = Math.min(100, next[activeValve] + 0.85); // Faster progress
-            if (next.every((p) => p >= 100)) handleWin();
-            return next;
-          });
-        }
-      }, 50); // Fast tick
-    } else {
-      if (holdInterval.current) clearInterval(holdInterval.current);
-    }
-
-    return () => {
-      if (holdInterval.current) clearInterval(holdInterval.current);
-    };
-  }, [activeValve, overheated, boltProgress, status]); // Added dependencies
-
-  const averageHeat = boltHeat.reduce((a, b) => a + b, 0) / boltCount;
-
   return (
-    <div className="boltturn-wrapper" onMouseUp={stopTurning}>
+    <div
+      className="boltturn-wrapper"
+      onMouseUp={stopTurning}
+      onMouseLeave={stopTurning}
+    >
       <motion.div
         className="boltturn-laptop-frame"
         initial={{ opacity: 0, scale: 0.9, rotateX: 20, y: 50 }}
@@ -263,11 +404,11 @@ const BoltTurnGame: React.FC = () => {
           <div className="boltturn-header">
             <div className="header-left">
               <span className="boltturn-title">
-                {boltLocale.title || "PRESSURE CONTROL SYSTEM"}
+                {boltLocale.title || "ELEVATOR HYDRAULICS"}
               </span>
               <div className="system-status">
                 <span className="status-label">
-                  {boltLocale.valves_label || "VALVES STATE"}:
+                  {boltLocale.valves_label || "TORQUE SECURED"}:
                 </span>
                 <div className="status-bars">
                   {boltProgress.map((p, i) => (
@@ -290,22 +431,27 @@ const BoltTurnGame: React.FC = () => {
               </div>
             </div>
 
-            <div className="system-id">SYSTEM_ID: MBT_BT_88</div>
+            <div className="system-id">SYSTEM_ID: MBT_ELEV_MECH</div>
           </div>
 
           <div className="main-layout">
             <div className="side-indicators container-glass">
+              {/* Dummy overall stability derived from progress */}
               <CurvedGauge
-                value={averageHeat}
-                label={boltLocale.neural_load || "NEURAL LOAD"}
+                value={
+                  (boltProgress.reduce((a, b) => a + b, 0) /
+                    (boltCount * 100)) *
+                  100
+                }
+                label={boltLocale.neural_load || "COMPLETION"}
               />
 
               <div className="indicator-group" style={{ marginTop: "2vmin" }}>
                 <span className="stability-value">
-                  {Math.max(0, 100 - heatErrors * 33)}%
+                  {Math.max(0, 100 - (mistakes / maxErrors) * 100)}%
                 </span>
                 <span className="group-label">
-                  {boltLocale.stability || "STABILITY"}
+                  {boltLocale.stability || "STRUCTURAL INTEGRITY"}
                 </span>
               </div>
             </div>
@@ -314,25 +460,70 @@ const BoltTurnGame: React.FC = () => {
               {boltProgress.map((prog, idx) => (
                 <div
                   key={idx}
-                  className={`bolt-wrapper ${prog >= 100 ? "bolt-done" : ""} ${overheated[idx] ? "overheated" : ""} ${boltHeat[idx] > 60 ? "heating" : ""} ${boltHeat[idx] > 85 ? "critical" : ""} ${glitchedValves[idx] ? "card-glitch" : ""}`}
+                  className={`bolt-wrapper ${prog >= 100 ? "bolt-done" : ""} ${overheated[idx] ? "overheated" : ""} ${glitchedValves[idx] ? "card-glitch" : ""}`}
                 >
                   <div className="valve-label-top">
-                    <span className="valve-id">VALVE #{idx + 1}</span>
-                    <span className="valve-action">ADJUST</span>
+                    <span className="valve-id">PULLEY #{idx + 1}</span>
+                    <span className="valve-action">TORQUE</span>
                   </div>
+
+                  {/* Tension & Sweet Spot HUD */}
                   <div className="valve-hud">
+                    {/* Background Track */}
                     <svg
                       viewBox="0 0 100 100"
-                      style={{ transform: "rotate(-90deg)" }}
+                      style={{
+                        transform: "rotate(-90deg)",
+                        position: "absolute",
+                      }}
                     >
                       <circle cx="50" cy="50" r="45" className="hud-ring" />
+                    </svg>
+
+                    {/* Rotating Sweet Spot Arc */}
+                    <svg
+                      id={`arc-container-${idx}`}
+                      viewBox="0 0 100 100"
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: 0,
+                        width: "100%",
+                        height: "100%",
+                      }}
+                    >
                       <circle
+                        id={`sweet-arc-${idx}`}
                         cx="50"
                         cy="50"
                         r="45"
-                        className="hud-progress"
+                        fill="none"
+                        stroke="rgba(57, 255, 20, 0.4)"
+                        strokeWidth="8"
+                        strokeDasharray="0 283"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+
+                    {/* Player Tension Needle */}
+                    <svg
+                      viewBox="0 0 100 100"
+                      style={{
+                        transform: "rotate(-90deg)",
+                        position: "absolute",
+                      }}
+                    >
+                      <circle
+                        id={`needle-${idx}`}
+                        cx="50"
+                        cy="50"
+                        r="45"
+                        fill="none"
+                        stroke="#00f2ff"
+                        strokeWidth="3"
                         strokeDasharray="283"
-                        strokeDashoffset={283 - (283 * prog) / 100}
+                        strokeDashoffset={"283"}
+                        style={{ filter: "drop-shadow(0 0 5px currentColor)" }}
                       />
                     </svg>
                   </div>
@@ -340,8 +531,9 @@ const BoltTurnGame: React.FC = () => {
                   <motion.div
                     className="bolt-svg-container"
                     onMouseDown={() => startTurning(idx)}
-                    onMouseUp={stopTurning}
-                    onMouseLeave={stopTurning}
+                    onMouseLeave={() => {
+                      if (activeValve === idx) stopTurning();
+                    }}
                     animate={{
                       rotate: prog * 5,
                       scale: activeValve === idx ? 0.95 : 1,
@@ -362,21 +554,21 @@ const BoltTurnGame: React.FC = () => {
                       <circle
                         cx="50"
                         cy="50"
-                        r="40"
+                        r="30" /* Slightly smaller bolt to show tension ring outside */
                         fill="url(#knobGradient)"
                         stroke="#444"
                         strokeWidth="2"
                       />
-                      <path
-                        d="M 50 15 L 50 85 M 15 50 L 85 50"
+                      <polygon
+                        points="50,15 80,33 80,67 50,85 20,67 20,33"
+                        fill="none"
                         stroke="#222"
-                        strokeWidth="2"
-                        strokeLinecap="round"
+                        strokeWidth="3"
                       />
                       <circle
                         cx="50"
                         cy="50"
-                        r="12"
+                        r="8"
                         fill="#222"
                         stroke="#ff9d00"
                         strokeWidth="1"
@@ -385,67 +577,59 @@ const BoltTurnGame: React.FC = () => {
                           transition: "opacity 0.2s",
                         }}
                       />
-                      <path
-                        d="M 50 42 L 50 58 M 42 50 L 58 50"
-                        stroke="#ff9d00"
-                        strokeWidth="2"
-                        style={{
-                          opacity: activeValve === idx ? 1 : 0.4,
-                        }}
-                      />
                     </svg>
                   </motion.div>
 
-                  <div className="status-indicators">
+                  <div
+                    className="status-indicators"
+                    style={{ marginTop: "1vmin" }}
+                  >
                     <div className="label-small">
-                      <span>{boltLocale.heat_label || "HEAT"}</span>
-                      <span>{Math.floor(boltHeat[idx])}%</span>
+                      <span>{boltLocale.heat_label || "TENSION"}</span>
+                      <span id={`tension-text-${idx}`}>0%</span>
                     </div>
                     <div className="meter-bar">
                       <div
                         className="meter-fill"
                         style={{
-                          width: `${boltHeat[idx]}%`,
-                          background:
-                            boltHeat[idx] > 85
-                              ? "#ff0044"
-                              : boltHeat[idx] > 60
-                                ? "#ff9d00"
-                                : "#00f2ff",
-                          boxShadow: `0 0 10px ${boltHeat[idx] > 85 ? "#ff0044" : "#ff9d00"}`,
+                          width: `${prog}%`,
+                          background: prog >= 100 ? "#39ff14" : "#00f2ff",
+                          boxShadow: `0 0 10px ${prog >= 100 ? "#39ff14" : "#00f2ff"}`,
+                          transition: "width 0.2s ease",
                         }}
                       />
                     </div>
                   </div>
                 </div>
               ))}
+
               <div className="side-indicators-right container-glass">
                 <span className="group-label" style={{ color: "#ff3366" }}>
-                  {boltLocale.system_breaches || "SYSTEM BREACHES"}
+                  {boltLocale.system_breaches || "CABLE SNAPS"}
                 </span>
                 <div className="breach-slots">
                   {Array.from({ length: maxErrors }).map((_, i) => (
                     <div
                       key={i}
-                      className={`breach-slot ${i < heatErrors ? "active" : ""}`}
+                      className={`breach-slot ${i < mistakes ? "active" : ""}`}
                     >
                       <div className="slot-glow" />
-                      <span className="slot-id">B-0{i + 1}</span>
+                      <span className="slot-id">F-0{i + 1}</span>
                       <span className="slot-status">
-                        {i < heatErrors ? "VOID" : "SAFE"}
+                        {i < mistakes ? "STRIPPED" : "INTACT"}
                       </span>
                     </div>
                   ))}
                 </div>
                 <div className="integrity-meter">
                   <div className="meter-label">
-                    {boltLocale.core_integrity || "CORE INTEGRITY"}
+                    {boltLocale.core_integrity || "STRUCTURAL INTEGRITY"}
                   </div>
                   <div className="meter-bar">
                     <div
                       className="meter-fill"
                       style={{
-                        width: `${100 - (heatErrors / maxErrors) * 100}%`,
+                        width: `${Math.max(0, 100 - (mistakes / maxErrors) * 100)}%`,
                         background: "#00f2ff",
                         boxShadow: "0 0 10px rgba(0, 242, 255, 0.5)",
                       }}
@@ -458,10 +642,12 @@ const BoltTurnGame: React.FC = () => {
 
           <div className="bottom-hud">
             <div className="error-log container-glass">
-              <div className="log-header">ERROR_LOG_INTERNAL</div>
+              <div className="log-header">
+                {boltLocale.log_header || "MECHANICAL_LOG_INTERNAL"}
+              </div>
               <div className="log-content-static">
                 {errorLog.length === 0 ? (
-                  "NO ERRORS DETECTED"
+                  boltLocale.log_empty || "AWAITING TORQUE APPLICATION"
                 ) : (
                   <AnimatePresence mode="popLayout">
                     {errorLog.map((log, i) => (
@@ -471,7 +657,7 @@ const BoltTurnGame: React.FC = () => {
                         animate={{ opacity: 1, x: 0 }}
                         className="log-entry"
                         style={{
-                          color: log.includes("CRITICAL") ? "#ff3366" : "#888",
+                          color: log.includes("STRIPPED") ? "#ff3366" : "#888",
                         }}
                       >
                         [{new Date().toLocaleTimeString()}] {log}
@@ -488,7 +674,14 @@ const BoltTurnGame: React.FC = () => {
                 <div className="info-line">
                   ID: {sessionId?.substring(0, 8) || "N/A"}...
                 </div>
-                <div className="info-line blink-text">ANALYZING_SYSTEM...</div>
+                <div className="info-line blink-text">ANALYZING_TORQUE...</div>
+                <div
+                  className="info-line"
+                  style={{ color: "#39ff14", marginTop: "1vmin" }}
+                >
+                  * HOLD MOUSE TO APPLY FORCE
+                  <br />* KEEP TENSION IN GREEN ARC
+                </div>
               </div>
             </div>
           </div>
@@ -510,13 +703,15 @@ const BoltTurnGame: React.FC = () => {
                 >
                   <h1 className="blink-text">
                     {status === "won"
-                      ? boltLocale.success_title || "SYSTEM STABILIZED"
-                      : boltLocale.fail_title || "SYSTEM OVERHEAT"}
+                      ? boltLocale.won || "PULLEYS SECURED"
+                      : boltLocale.lost || "MECHANICAL FAILURE"}
                   </h1>
                   <p>
                     {status === "won"
-                      ? boltLocale.success_desc || "PRESSURE LEVELS NOMINAL"
-                      : boltLocale.fail_desc || "CRITICAL CORE FAILURE"}
+                      ? boltLocale.won_sub || "TORQUE LEVELS NOMINAL"
+                      : timeLeft <= 0
+                        ? boltLocale.lost_sub_time || "TIME EXPIRED"
+                        : boltLocale.lost_sub_meltdown || "CRITICAL CABLE SNAP"}
                   </p>
                 </motion.div>
               </motion.div>
@@ -524,6 +719,12 @@ const BoltTurnGame: React.FC = () => {
           </AnimatePresence>
         </div>
       </motion.div>
+      {debug && status === "playing" && (
+        <div className="debug-controls">
+          <button onClick={() => handleEnd(true)}>DEBUG: WIN</button>
+          <button onClick={() => handleEnd(false)}>DEBUG: FAIL</button>
+        </div>
+      )}
     </div>
   );
 };
