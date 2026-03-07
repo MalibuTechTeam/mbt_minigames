@@ -1,88 +1,32 @@
-local session = {}
-local bh = false
-
-Utils = {}
-
-function Utils.MbtDebugger(...)
-    if MBT.Debug then
-        local arg = { ... }
-        local printResult = "[" .. GetCurrentResourceName() .. "] | "
-        for _, v in ipairs(arg) do
-            printResult = printResult .. tostring(v) .. "\t"
-        end
-        printResult = printResult .. "\n"
-        print(printResult)
-    end
-end
-
--- Debug: Check if config loaded
-Citizen.CreateThread(function()
-    Wait(1000)
-    if MBT and MBT.Locale then
-        Utils.MbtDebugger("Locale system and Difficulty profiles loaded.")
-        Utils.MbtDebugger("Configuration loaded successfully.")
-    else
-        Utils.MbtDebugger("^1ERROR: Configuration table 'MBT.Locale' not found!^7")
-    end
-end)
-
----@param data table
-local function SendNUI(data)
-    SendNUIMessage(data)
-end
-
-local function generateSessionId()
-    local randomStr = ""
-    for i = 1, 20 do
-        randomStr = randomStr .. string.char(math.random(97, 122))
-    end
-    if session[randomStr] ~= nil then
-        return generateSessionId()
-    end
-
-    return randomStr
-end
-
----@param animdict string
-local function loadAnimDict(animdict)
-    while (not HasAnimDictLoaded(animdict)) do
-        RequestAnimDict(animdict)
-        Citizen.Wait(1)
-    end
-end
-
----@param model string
-local function loadModel(model)
-    local timeout = false
-    SetTimeout(5000, function() timeout = true end)
-
-    local hashModel = GetHashKey(model)
-    repeat
-        RequestModel(hashModel)
-        Wait(50)
-    until HasModelLoaded(hashModel) or timeout
-end
+local Utils = loadModule('modules.utils.client')
+local Sessions = loadModule('modules.sessions.client')
+local Animations = loadModule('modules.animations.client')
+local Debug = loadModule('modules.debug.client')
 
 ---@param data table
 ---@return boolean
 local function startHackingSession(data)
-    local sessionId = generateSessionId()
-    session[sessionId] = { Active = true, Response = nil }
+    local sessionId = Sessions.Start("hacking", Utils)
+    local sState = Sessions.Get(sessionId)
 
     local ped = PlayerPedId()
     local pedCoords = GetEntityCoords(ped)
     local pedRotation = GetEntityRotation(ped)
-    local animDict = "anim@heists@ornate_bank@hack"
 
-    loadAnimDict(animDict)
-    loadModel("hei_prop_hst_laptop")
-    loadModel("hei_p_m_bag_var22_arm_s")
+    local animConfig = MBT.Animations['hacking'] or {}
+    local animDict = animConfig.Dict or "anim@heists@ornate_bank@hack"
+    local laptopModel = animConfig.Prop or "hei_prop_hst_laptop"
+    local bagModel = animConfig.Bag or "hei_p_m_bag_var22_arm_s"
+
+    Utils.LoadAnimDict(animDict)
+    Utils.LoadModel(laptopModel)
+    Utils.LoadModel(bagModel)
 
     SetFollowPedCamViewMode(4)
 
     local animOffsetX = 0.0
     local animOffsetY = 0.0
-    local animOffsetZ = 0.9 -- Adjust this value to prevent the player from going through the ground
+    local animOffsetZ = animConfig.OffsetZ or 0.9
 
     local animPos = GetAnimInitialOffsetPosition(animDict, "hack_enter", pedCoords.x + animOffsetX,
         pedCoords.y + animOffsetY, pedCoords.z + animOffsetZ, pedRotation.x, pedRotation.y, pedRotation.z, 2)
@@ -96,9 +40,9 @@ local function startHackingSession(data)
     local netScene = NetworkCreateSynchronisedScene(animPos.x, animPos.y, animPos.z, pedRotation.x, pedRotation.y,
         pedRotation.z, 2, false, false, 1065353216, 0, 1.3)
     NetworkAddPedToSynchronisedScene(ped, netScene, animDict, "hack_enter", 1.5, -4.0, 1, 16, 1148846080, 0)
-    local bag = CreateObject(GetHashKey("hei_p_m_bag_var22_arm_s"), pedCoords.x, pedCoords.y, pedCoords.z, 1, 1, 0)
+    local bag = CreateObject(GetHashKey(bagModel), pedCoords.x, pedCoords.y, pedCoords.z, 1, 1, 0)
     NetworkAddEntityToSynchronisedScene(bag, netScene, animDict, "hack_enter_bag", 4.0, -8.0, 1)
-    local laptop = CreateObject(GetHashKey("hei_prop_hst_laptop"), pedCoords.x, pedCoords.y, pedCoords.z, 1, 1, 0)
+    local laptop = CreateObject(GetHashKey(laptopModel), pedCoords.x, pedCoords.y, pedCoords.z, 1, 1, 0)
     NetworkAddEntityToSynchronisedScene(laptop, netScene, animDict, "hack_enter_laptop", 4.0, -8.0, 1)
 
     local netScene2 = NetworkCreateSynchronisedScene(animPos2.x, animPos2.y, animPos2.z, pedRotation.x, pedRotation.y,
@@ -112,8 +56,8 @@ local function startHackingSession(data)
     NetworkAddPedToSynchronisedScene(ped, netScene3, animDict, "hack_exit", 1.5, -4.0, 1, 16, 1148846080, 0)
     NetworkAddEntityToSynchronisedScene(bag, netScene3, animDict, "hack_exit_bag", 4.0, -8.0, 1)
     NetworkAddEntityToSynchronisedScene(laptop, netScene3, animDict, "hack_exit_laptop", 4.0, -8.0, 1)
-    Citizen.Wait(500)
 
+    Citizen.Wait(500)
     NetworkStartSynchronisedScene(netScene)
     Citizen.Wait(4500)
     NetworkStopSynchronisedScene(netScene)
@@ -122,12 +66,9 @@ local function startHackingSession(data)
     -- Difficulty & Parameter Resolution
     local diffRaw = data.difficulty or data.Difficulty or MBT.DefaultDifficulty or "Easy"
     local diff = string.upper(string.sub(diffRaw, 1, 1)) .. string.lower(string.sub(diffRaw, 2))
-
     local configParams = (MBT.Difficulties and MBT.Difficulties[diff] and MBT.Difficulties[diff]['hacking']) or {}
-
     local timeLimit = data.Time or data.time or configParams.time or 30
 
-    -- Merge parameters (Caller override > Config difficulty > Defaults)
     local finalParams = {}
     for k, v in pairs(configParams) do finalParams[k] = v end
     local extraParams = data.params or data.Params or {}
@@ -135,7 +76,7 @@ local function startHackingSession(data)
 
     Utils.MbtDebugger("Starting Hacking Session | Diff: " .. diff .. " | Time: " .. timeLimit)
 
-    SendNUI({
+    SendNUIMessage({
         Action = "handleUI",
         Status = true,
         Payload = {
@@ -143,20 +84,19 @@ local function startHackingSession(data)
             Type = "hacking",
             TimeLimit = timeLimit,
             Params = finalParams,
-            Locale = MBT.Locale
+            Locale = MBT.Locale,
+            Debug = MBT.Debug
         }
     })
 
     SetNuiFocus(true, true)
 
-    while session[sessionId].Response == nil do
+    while sState.Response == nil do
         Citizen.Wait(5)
     end
 
-    local outcome = session[sessionId].Response
-
+    local outcome = sState.Response
     NetworkStopSynchronisedScene(netScene2)
-
     NetworkStartSynchronisedScene(netScene3)
     Citizen.Wait(6000)
     DeleteObject(laptop)
@@ -165,8 +105,7 @@ local function startHackingSession(data)
 
     SetFollowPedCamViewMode(0)
     FreezeEntityPosition(ped, false)
-
-    session[sessionId] = nil
+    Sessions.Cleanup(sessionId)
 
     return outcome
 end
@@ -174,62 +113,85 @@ end
 ---@param data table
 ---@return boolean
 local function startRepairSession(data)
-    local sessionId = generateSessionId()
-    session[sessionId] = { Active = true, Response = nil }
+    -- Safety wait to ensure previous UI/Animations (like ox_lib progressbar)
+    Citizen.Wait(100)
+
+    local type = data.type or "hacking"
+    if type == "hacking" then
+        return startHackingSession(data)
+    end
+
+    local sessionId = Sessions.Start(type, Utils)
+    local sState = Sessions.Get(sessionId)
 
     local ped = PlayerPedId()
     local pedCoords = GetEntityCoords(ped)
-    local type = data.type or "hacking"
 
     -- Difficulty & Parameter Resolution
     local diffRaw = data.difficulty or data.Difficulty or MBT.DefaultDifficulty or "Easy"
     local diff = string.upper(string.sub(diffRaw, 1, 1)) .. string.lower(string.sub(diffRaw, 2))
-
     local configParams = (MBT.Difficulties and MBT.Difficulties[diff] and MBT.Difficulties[diff][type]) or {}
-
     local time = data.time or data.Time or configParams.time or 30
 
-    if type == "hacking" then
-        return startHackingSession(data) -- Keep original complex animation for hacking
-    end
+    -- Animation Resolve
+    local baseAnimConfig = MBT.Animations[type] or {}
+    local callerAnimOverrides = data.animation or {}
+    local finalAnimData = {
+        Type = (callerAnimOverrides.Type or baseAnimConfig.Type) == "Scene" and "Sequence" or
+            (callerAnimOverrides.Type or baseAnimConfig.Type),
+        Dict = callerAnimOverrides.Dict or baseAnimConfig.Dict or "anim@amb@clubhouse@tutorial@bkr_tut_ig3@",
+        Name = callerAnimOverrides.Name or callerAnimOverrides.Loop or baseAnimConfig.Name or baseAnimConfig.Loop or
+            "machinic_loop_me_mechanic",
+        Enter = callerAnimOverrides.Enter or baseAnimConfig.Enter,
+        Loop = callerAnimOverrides.Loop or callerAnimOverrides.Name or baseAnimConfig.Loop or baseAnimConfig.Name,
+        Exit = callerAnimOverrides.Exit or baseAnimConfig.Exit,
+        EnterTime = callerAnimOverrides.EnterTime or baseAnimConfig.EnterTime or 2000,
+        ExitTime = callerAnimOverrides.ExitTime or baseAnimConfig.ExitTime or 2000,
+        Props = callerAnimOverrides.Props or baseAnimConfig.Props,
+        Prop = callerAnimOverrides.Prop or baseAnimConfig.Prop,
+        Bone = callerAnimOverrides.Bone or baseAnimConfig.Bone or 28422,
+        Offset = callerAnimOverrides.Offset or baseAnimConfig.Offset or vector3(0.0, 0.0, 0.0),
+        OffsetZ = callerAnimOverrides.OffsetZ or baseAnimConfig.OffsetZ or 0.0,
+        Rot = callerAnimOverrides.Rot or baseAnimConfig.Rot or vector3(0.0, 0.0, 0.0),
+        Particles = callerAnimOverrides.Particles or baseAnimConfig.Particles,
+        EnterFlag = callerAnimOverrides.EnterFlag or baseAnimConfig.EnterFlag or 0,
+        LoopFlag = callerAnimOverrides.LoopFlag or baseAnimConfig.LoopFlag or 1,
+        ExitFlag = callerAnimOverrides.ExitFlag or baseAnimConfig.ExitFlag or 0,
+        -- Sequence/Scene Mapping
+        PreEnter = callerAnimOverrides.PreEnter or baseAnimConfig.PreEnter,
+        PreEnterDict = callerAnimOverrides.PreEnterDict or baseAnimConfig.PreEnterDict,
+        PreEnterTime = callerAnimOverrides.PreEnterTime or baseAnimConfig.PreEnterTime,
+        PreProps = callerAnimOverrides.PreProps or baseAnimConfig.PreProps,
+        EnterPropDelay = callerAnimOverrides.EnterPropDelay or baseAnimConfig.EnterPropDelay,
+        EnterDict = callerAnimOverrides.EnterDict or baseAnimConfig.EnterDict,
+        LoopDict = callerAnimOverrides.LoopDict or baseAnimConfig.LoopDict,
+        ExitDict = callerAnimOverrides.ExitDict or baseAnimConfig.ExitDict,
+        PreEnterFlag = callerAnimOverrides.PreEnterFlag or baseAnimConfig.PreEnterFlag
+    }
 
-    -- For code_match or other types, use a more professional repair animation
-    local animData = data.animation or {}
-
-    -- Ensure code_match has a default PC prop if not provided
-    if type == "code_match" and not animData.Prop then
-        animData.Prop = "prop_laptop_01a"
-        animData.Bone = 60309 -- Left Hand
-        animData.Offset = vector3(0.12, 0.0, 0.0)
-        animData.Rot = vector3(0.0, 0.0, 0.0)
-    end
-    local animDict = animData.Dict or "anim@amb@clubhouse@tutorial@bkr_tut_ig3@"
-    local animName = animData.Name or "machinic_loop_me_mechanic"
-
-    loadAnimDict(animDict)
-    ClearPedTasks(ped)
-
-    -- Handle Prop (Standalone logic)
+    local sceneProps = {}
+    local sceneFx = {}
     local propObj = nil
-    if animData.Prop then
-        local propName = animData.Prop
-        local bone = animData.Bone or 28422
-        local offset = animData.Offset or vector3(0.0, 0.0, 0.0)
-        local rot = animData.Rot or vector3(0.0, 0.0, 0.0)
 
-        loadModel(propName)
-        propObj = CreateObject(GetHashKey(propName), pedCoords.x, pedCoords.y, pedCoords.z + 0.2, true, true, true)
-        AttachEntityToEntity(propObj, ped, GetPedBoneIndex(ped, bone), offset.x, offset.y, offset.z, rot.x, rot.y, rot.z,
-            true, true, false, true, 1, true)
+    if finalAnimData.Type == "Sequence" then
+        Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, sceneFx, Utils)
+    else
+        Utils.LoadAnimDict(finalAnimData.Dict)
+        if finalAnimData.Prop then
+            Utils.LoadModel(finalAnimData.Prop)
+            propObj = CreateObject(GetHashKey(finalAnimData.Prop), pedCoords.x, pedCoords.y, pedCoords.z, true,
+                true, true)
+            SetEntityAsMissionEntity(propObj, true, true)
+            AttachEntityToEntity(propObj, ped, GetPedBoneIndex(ped, finalAnimData.Bone), finalAnimData.Offset.x,
+                finalAnimData.Offset.y, finalAnimData.Offset.z, finalAnimData.Rot.x, finalAnimData.Rot.y,
+                finalAnimData.Rot.z, true, true, false, false, 0, true)
+        end
+        if not IsEntityPlayingAnim(ped, finalAnimData.Dict, finalAnimData.Name, 3) then
+            TaskPlayAnim(ped, finalAnimData.Dict, finalAnimData.Name, 16.0, -8.0, -1, 1, 0, false, false, false)
+        end
+        FreezeEntityPosition(ped, true)
     end
 
-    -- Persistent animation check: only play if not already playing to avoid flicker
-    if not IsEntityPlayingAnim(ped, animDict, animName, 3) then
-        TaskPlayAnim(ped, animDict, animName, 8.0, -8.0, -1, 1, 0, false, false, false)
-    end
-    FreezeEntityPosition(ped, true)
-
-    -- Merge parameters (Caller override > Config difficulty > Defaults)
     local finalParams = {}
     for k, v in pairs(configParams) do finalParams[k] = v end
     local extraParams = data.params or data.Params or {}
@@ -237,7 +199,7 @@ local function startRepairSession(data)
 
     Utils.MbtDebugger("Starting Repair Session | Type: " .. type .. " | Diff: " .. diff .. " | Time: " .. time)
 
-    SendNUI({
+    SendNUIMessage({
         Action = "handleUI",
         Status = true,
         Payload = {
@@ -245,50 +207,42 @@ local function startRepairSession(data)
             Type = type,
             TimeLimit = time,
             Params = finalParams,
-            Locale = MBT.Locale
+            Locale = MBT.Locale,
+            Debug = MBT.Debug
         }
     })
 
     SetNuiFocus(true, true)
 
-    while session[sessionId].Response == nil do
+    while sState.Response == nil do
+        Animations.UpdatePtfxPulse(sceneFx)
         Citizen.Wait(100)
     end
 
-    local outcome = session[sessionId].Response
+    local outcome = sState.Response
 
-    ClearPedTasks(ped)
+    if finalAnimData.Type == "Sequence" then
+        Animations.StopSequence(finalAnimData, ped, sceneProps, sceneFx, Utils)
+    else
+        ClearPedTasks(ped)
+        if propObj then DeleteObject(propObj) end
+    end
+
     FreezeEntityPosition(ped, false)
     SetNuiFocus(false, false)
 
-    if propObj then
-        DeleteObject(propObj)
-    end
-
-    -- Support for callbacks if used
     if outcome and data.onSuccess then data.onSuccess() end
     if not outcome and data.onFail then data.onFail() end
 
-    session[sessionId] = nil
-
+    Sessions.Cleanup(sessionId)
     return outcome
 end
 
 RegisterNUICallback("hackingEnd", function(data, cb)
-    bh = false
     SetNuiFocus(false, false)
-    if session[data.sessionId] then
-        session[data.sessionId].Response = data.outcome
-    end
-
+    Sessions.SetResponse(data.sessionId, data.outcome)
     Wait(2000)
-
-    SendNUI({
-        Action = "handleUI",
-        Status = false,
-        Payload = {}
-    })
-
+    SendNUIMessage({ Action = "handleUI", Status = false, Payload = {} })
     cb("ok")
 end)
 
@@ -300,14 +254,16 @@ exports('startRepairSession', function(data)
     return startRepairSession(data)
 end)
 
--- Debug Command
-RegisterCommand("testminigame", function(source, args)
-    local type = args[1] or "code_match"
-    local diff = args[2] or "Easy"
-    Utils.MbtDebugger("Debug Command: Testing " .. type .. " on " .. diff)
-    local outcome = startRepairSession({
-        type = type,
-        difficulty = diff
+
+-- Debug/Init Module Initialization
+if Debug then
+    Debug.Initialize({
+        startHackingSession = startHackingSession,
+        startRepairSession = startRepairSession
     })
-    Utils.MbtDebugger("Debug Result: " .. tostring(outcome))
-end, false)
+end
+
+return {
+    startHackingSession = startHackingSession,
+    startRepairSession = startRepairSession
+}
