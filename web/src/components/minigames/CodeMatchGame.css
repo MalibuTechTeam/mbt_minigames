@@ -1,36 +1,6 @@
-.codematch-wrapper {
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: transparent;
-    overflow: hidden;
-    position: absolute;
-    top: 0;
-    left: 0;
-}
-
-.codematch-laptop-frame {
-    position: relative;
-    height: 90vh;
-    width: auto;
-    aspect-ratio: 1920 / 1080;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 10;
-    max-width: 95vw;
-    perspective: 1200px; /* Enhanced 3D perspective */
-}
-
 .codematch-container {
-    position: absolute;
-    top: 8.1%;
-    left: 18.3%;
-    width: 63.2%;
-    height: 69.5%;
     background: #0a0a0c;
+    position: relative;
     display: flex;
     flex-direction: column;
     padding: 2vmin;
@@ -150,12 +120,12 @@
 
 /* STREAM AREA */
 .stream-area {
-    flex: 1;
+    height: 40vh;
     position: relative;
     overflow: hidden;
     border: 1px solid rgba(57, 255, 20, 0.2);
     background: rgba(0, 0, 0, 0.4);
-    box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
+    box-shadow: inset 0 0 2vmin rgba(57, 255, 20, 0.05);
 }
 
 .scanline-bar {
@@ -163,49 +133,110 @@
     top: 50%;
     left: 0;
     width: 100%;
-    height: 0.6vmin;
-    background: rgba(57, 255, 20, 0.4);
-    box-shadow: 0 0 15px #39ff14;
+    height: 0.4vmin;
+    background: rgba(57, 255, 20, 0.2);
+    box-shadow: 0 0 10px #39ff14;
     z-index: 5;
     transform: translateY(-50%);
     pointer-events: none;
 }
 
+/* New Focus Brackets */
+.scanner-bracket {
+    position: absolute;
+    top: 16vh;
+    left: 2vmin;
+    right: 2vmin;
+    height: 8vh;
+    border-left: 4px solid #39ff14;
+    border-right: 4px solid #39ff14;
+    background: rgba(57, 255, 20, 0.05); /* very light tint */
+    pointer-events: none;
+    z-index: 4;
+    border-radius: 4px;
+    box-shadow: inset 20px 0 30px -20px rgba(57, 255, 20, 0.2), 
+                inset -20px 0 30px -20px rgba(57, 255, 20, 0.2);
+}
+
+.scanner-bracket::before, .scanner-bracket::after {
+    content: '';
+    position: absolute;
+    width: 15px;
+    height: 4px;
+    background: #39ff14;
+}
+
+.scanner-bracket::before { top: 0; left: 0; }
+.scanner-bracket::after { bottom: 0; right: 0; }
+
 .stream-column {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0; /* Removing gap to have precise item height math */
+    gap: 0; 
+    will-change: transform;
 }
+
 
 .stream-item {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 2.8vmin;
-    height: 60px; /* Fixed height for scrolling sync */
+    height: 8vh;
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    gap: 3vmin;
     padding: 0 4vmin;
-    cursor: pointer;
-    color: rgba(57, 255, 20, 0.4);
-    transition: color 0.1s, text-shadow 0.1s;
-    width: 100%;
+    font-size: 2.5vmin;
+    color: rgba(57, 255, 20, 0.8);
+    font-family: monospace;
+    transition: background-color 0.2s, color 0.2s;
 }
 
-.stream-item .memory-addr {
+.stream-item:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.015);
+}
+
+.stream-item.hit-success {
+    background-color: rgba(57, 255, 20, 0.5);
+    color: #fff;
+    text-shadow: 0 0 10px #fff;
+}
+
+.memory-addr {
     font-size: 1.2vmin;
-    opacity: 0.3;
+    opacity: 0.15; /* Dimmer */
     color: #fff;
     font-weight: 400;
+    font-family: 'JetBrains Mono', monospace;
 }
 
-.stream-item:hover {
-    color: #fff;
-    background: rgba(57, 255, 20, 0.15);
-    text-shadow: 0 0 15px #39ff14;
-    transform: scale(1.1);
-    letter-spacing: 0.1vmin;
+.code-val {
+    letter-spacing: 0.8vmin; /* Add spacing so C41F looks like C 4 1 F */
+    text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
+}
+
+.action-hint {
+    position: absolute;
+    bottom: 2vmin;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.8vmin;
+    color: #39ff14;
+    letter-spacing: 0.2vmin;
+    text-shadow: 0 0 10px rgba(57, 255, 20, 0.6);
+    z-index: 500;
+    animation: codematch-pulse 2s infinite;
+    pointer-events: none;
+    background: rgba(10, 10, 12, 0.9);
+    padding: 0.5vmin 3vmin;
+    border-radius: 4px;
+    border: 1px solid rgba(57, 255, 20, 0.4);
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
+    white-space: nowrap;
+}
+
+@keyframes codematch-pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; text-shadow: 0 0 20px #39ff14; }
 }
 
 /* Isolated Status Classes */

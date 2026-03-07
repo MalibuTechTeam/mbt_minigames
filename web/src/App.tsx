@@ -22,6 +22,7 @@ const App: React.FC = () => {
             data.Payload.TimeLimit,
             data.Payload.Params,
             data.Payload.Locale,
+            data.Payload.Debug,
           );
         } else {
           closeGame();

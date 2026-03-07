@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useMinigameStore } from "../../store/useMinigameStore";
 import { fetchNui } from "../../utils/fetchNui";
 import { motion, AnimatePresence } from "framer-motion";
+import LaptopFrame from "./LaptopFrame";
 import "./HackingGame.css";
 
 const BootSequence: React.FC<{
@@ -55,7 +56,7 @@ const BootSequence: React.FC<{
 };
 
 const HackingGame: React.FC = () => {
-  const { timeLimit, sessionId, closeGame, gameParams, locale } =
+  const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
     useMinigameStore();
   const hackingLocale = locale?.hacking || {};
   const [timeLeft, setTimeLeft] = useState(timeLimit || 35);
@@ -178,143 +179,135 @@ const HackingGame: React.FC = () => {
   };
 
   return (
-    <div className="hacking-container pro-theme">
-      <div className="laptop-frame-container">
-        {/* User-Provided SVG Laptop Trace */}
-        <img
-          src="assets/laptop-frame.svg"
-          alt="Terminal Frame"
-          className="laptop-frame-img"
-          draggable={false}
-        />
+    <LaptopFrame>
+      <div className="screen-effects">
+        <div className="scanlines"></div>
+        <div className="screen-smudge"></div>
+        <div className="crt-flicker"></div>
+      </div>
 
-        {/* Mounted Terminal Screen */}
-        <div className="screen-content-mount">
-          <div className="screen-effects">
-            <div className="scanlines"></div>
-            <div className="screen-smudge"></div>
-            <div className="crt-flicker"></div>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {status !== "playing" ? (
-              <motion.div
-                key="result"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                className={`result-overlay-screen ${status}`}
-              >
-                <motion.div
-                  initial={{ y: 20 }}
-                  animate={{ y: 0 }}
-                  className="result-content"
-                >
-                  <h2 className="glitch-text">
-                    {status === "won"
-                      ? hackingLocale.granted || "ACCESS GRANTED"
-                      : hackingLocale.denied || "ACCESS DENIED"}
-                  </h2>
-                  <div className="status-line"></div>
-                  <p>
-                    {status === "won"
-                      ? hackingLocale.granted_sub || "SYSTEM OVERRIDE COMPLETE"
-                      : hackingLocale.denied_sub ||
-                        "SECURITY PROTOCOL TRIGGERED"}
-                  </p>
-                </motion.div>
-              </motion.div>
+      <AnimatePresence mode="wait">
+        {status !== "playing" ? (
+          <motion.div
+            key="result"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className={`result-overlay-screen ${status}`}
+          >
+            <motion.div
+              initial={{ y: 20 }}
+              animate={{ y: 0 }}
+              className="result-content"
+            >
+              <h2 className="glitch-text">
+                {status === "won"
+                  ? hackingLocale.granted || "ACCESS GRANTED"
+                  : hackingLocale.denied || "ACCESS DENIED"}
+              </h2>
+              <div className="status-line"></div>
+              <p>
+                {status === "won"
+                  ? hackingLocale.granted_sub || "SYSTEM OVERRIDE COMPLETE"
+                  : hackingLocale.denied_sub || "SECURITY PROTOCOL TRIGGERED"}
+              </p>
+            </motion.div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="game"
+            className="game-window"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {isBooting ? (
+              <BootSequence
+                onComplete={() => setIsBooting(false)}
+                hackingLocale={hackingLocale}
+              />
             ) : (
-              <motion.div
-                key="game"
-                className="game-window"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                {isBooting ? (
-                  <BootSequence
-                    onComplete={() => setIsBooting(false)}
-                    hackingLocale={hackingLocale}
-                  />
-                ) : (
-                  <>
-                    <div className="window-header">
-                      <div className="header-left">
-                        <span className="terminal-path">
-                          {hackingLocale.title || "TERMINAL NODE DECRYPTION"}
-                        </span>
-                      </div>
-                      <div className="header-right">
-                        <span>user@mbt-osc ~ /session_{displaySessionId}</span>
-                        <motion.span
-                          animate={{ opacity: [0, 1, 0] }}
-                          transition={{ duration: 1, repeat: Infinity }}
-                          className="cursor"
-                        >
-                          _
-                        </motion.span>
-                      </div>
-                      <div
-                        className="mistakes-counter"
-                        style={{
-                          color: mistakes >= maxMistakes - 1 ? "red" : "#fff",
-                          marginLeft: "10px",
+              <>
+                <div className="window-header">
+                  <div className="header-left">
+                    <span className="terminal-path">
+                      {hackingLocale.title || "TERMINAL NODE DECRYPTION"}
+                    </span>
+                  </div>
+                  <div className="header-right">
+                    <span>user@mbt-osc ~ /session_{displaySessionId}</span>
+                    <motion.span
+                      animate={{ opacity: [0, 1, 0] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                      className="cursor"
+                    >
+                      _
+                    </motion.span>
+                  </div>
+                  <div
+                    className="mistakes-counter"
+                    style={{
+                      color: mistakes >= maxMistakes - 1 ? "red" : "#fff",
+                      marginLeft: "10px",
+                    }}
+                  >
+                    ERRORS: {mistakes}/{maxMistakes}
+                  </div>
+                </div>
+
+                <div className="instruction-strip">
+                  {hackingLocale.instruction ||
+                    "IDENTIFY SEQUENCE PATTERN IN DESIGNATED ORDER"}
+                </div>
+
+                <div className="hacking-layout">
+                  <div className="grid-container">
+                    {gridItems.map((item, idx) => (
+                      <motion.div
+                        key={idx}
+                        className={`hacking-grid-item ${foundItems.includes(item) ? "selected" : ""} ${idx === wrongIndex ? "wrong" : ""}`}
+                        onClick={() => handleItemClick(item, idx)}
+                        onMouseEnter={() => {
+                          if (hoverSound.current) {
+                            hoverSound.current.currentTime = 0;
+                            hoverSound.current.play().catch(() => {});
+                          }
                         }}
                       >
-                        ERRORS: {mistakes}/{maxMistakes}
-                      </div>
+                        {item}
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  <div className="hacking-sidebar">
+                    <div className="sidebar-title">
+                      {hackingLocale.target_label || "TARGET SEQUENCE"}
                     </div>
-
-                    <div className="instruction-strip">
-                      {hackingLocale.instruction ||
-                        "IDENTIFY SEQUENCE PATTERN IN DESIGNATED ORDER"}
-                    </div>
-
-                    <div className="hacking-layout">
-                      <div className="grid-container">
-                        {gridItems.map((item, idx) => (
-                          <motion.div
-                            key={idx}
-                            className={`hacking-grid-item ${foundItems.includes(item) ? "selected" : ""} ${idx === wrongIndex ? "wrong" : ""}`}
-                            onClick={() => handleItemClick(item, idx)}
-                            onMouseEnter={() => {
-                              if (hoverSound.current) {
-                                hoverSound.current.currentTime = 0;
-                                hoverSound.current.play().catch(() => {});
-                              }
-                            }}
-                          >
-                            {item}
-                          </motion.div>
-                        ))}
-                      </div>
-
-                      <div className="hacking-sidebar">
-                        <div className="sidebar-title">
-                          {hackingLocale.target_label || "TARGET SEQUENCE"}
+                    <div className="wanted-sequence">
+                      {wantedItems.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className={`sequence-item ${idx < foundItems.length ? "found" : idx === foundItems.length ? "active" : "pending"}`}
+                        >
+                          {item}
                         </div>
-                        <div className="wanted-sequence">
-                          {wantedItems.map((item, idx) => (
-                            <div
-                              key={idx}
-                              className={`sequence-item ${idx < foundItems.length ? "found" : idx === foundItems.length ? "active" : "pending"}`}
-                            >
-                              {item}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="timer-box">{timeLeft}s</div>
-                      </div>
+                      ))}
                     </div>
-                  </>
-                )}
-              </motion.div>
+                    <div className="timer-box">{timeLeft}s</div>
+                  </div>
+                </div>
+              </>
             )}
-          </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {debug && status === "playing" && (
+        <div className="debug-controls">
+          <button onClick={() => handleEnd(true)}>DEBUG: WIN</button>
+          <button onClick={() => handleEnd(false)}>DEBUG: FAIL</button>
         </div>
-      </div>
-    </div>
+      )}
+    </LaptopFrame>
   );
 };
 

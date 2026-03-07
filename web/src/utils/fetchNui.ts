@@ -1,3 +1,5 @@
+import { useMinigameStore } from "../store/useMinigameStore";
+
 export const fetchNui = async (eventName: string, data: any = {}) => {
   const options = {
     method: 'POST',
@@ -17,5 +19,8 @@ export const fetchNui = async (eventName: string, data: any = {}) => {
 };
 
 export const debugLog = (msg: string) => {
-    console.log(`[MBT Minigames UI] ${msg}`);
+    const isDebug = useMinigameStore.getState().debug;
+    if (isDebug) {
+        console.log(`[mbt_minigames UI] ${msg}`);
+    }
 }

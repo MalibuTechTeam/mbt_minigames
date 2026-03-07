@@ -1,193 +1,428 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useMinigameStore } from "../../store/useMinigameStore";
 import { fetchNui } from "../../utils/fetchNui";
 import { motion, AnimatePresence } from "framer-motion";
 import "./WireFixGame.css";
 
-const COLORS = [
-  { name: "cyan", hex: "#00f2ff" },
-  { name: "pink", hex: "#ff0066" },
-  { name: "green", hex: "#39ff14" },
-  { name: "yellow", hex: "#ffcc00" },
-  { name: "purple", hex: "#b026ff" },
-  { name: "orange", hex: "#ff9100" },
-];
+// --- Types & Constants ---
 
-interface WirePoint {
-  id: number;
-  color: string;
-  side: "left" | "right";
+// A tile's connections define whether power can flow through its corresponding DIRS index.
+// Index 0: TOP, 1: RIGHT, 2: BOTTOM, 3: LEFT
+type ConnectionArray = [boolean, boolean, boolean, boolean];
+
+interface TileDef {
+  type: "STRAIGHT" | "CORNER" | "T_SHAPE" | "CROSS" | "EMPTY";
+  connections: ConnectionArray; // Base unrotated connections
 }
 
+const TILE_DICTIONARY: Record<string, TileDef> = {
+  STRAIGHT: { type: "STRAIGHT", connections: [false, true, false, true] }, // Horizontal
+  CORNER: { type: "CORNER", connections: [true, true, false, false] }, // Top-Right angle
+  T_SHAPE: { type: "T_SHAPE", connections: [true, true, false, true] }, // T-junction facing UP
+  CROSS: { type: "CROSS", connections: [true, true, true, true] },
+  EMPTY: { type: "EMPTY", connections: [false, false, false, false] },
+};
+
+interface GridTile {
+  id: string;
+  row: number;
+  col: number;
+  type: TileDef["type"];
+  rotation: number; // 0, 1, 2, 3 (each is 90deg clockwise)
+  powered: boolean;
+  isStartNode: boolean;
+  isEndNode: boolean;
+}
+
+// Utility to rotate connections array
+const getRotatedConnections = (
+  base: ConnectionArray,
+  rotation: number,
+): ConnectionArray => {
+  const rot = rotation % 4;
+  const result = [...base];
+  for (let i = 0; i < rot; i++) {
+    result.unshift(result.pop() as boolean);
+  }
+  return result as ConnectionArray;
+};
+
 const WireFixGame: React.FC = () => {
-  const { timeLimit, sessionId, closeGame, gameParams, locale } =
+  const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
     useMinigameStore();
   const wireLocale = locale?.wire_fix || {};
-  const [timeLeft, setTimeLeft] = useState(timeLimit || 25);
-  const [leftWires, setLeftWires] = useState<WirePoint[]>([]);
-  const [rightWires, setRightWires] = useState<WirePoint[]>([]);
-  const [connections, setConnections] = useState<{ [key: number]: number }>({});
-  const [draggingWireId, setDraggingWireId] = useState<number | null>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Difficulty mapping (wireCount acts as grid size)
+  const cols = gameParams.wireCount ? Math.max(4, gameParams.wireCount + 1) : 5;
+  const rows = Math.min(cols - 1, 5); // Example: 5x4, 6x5, 7x5
+  const initialTimeLimit = useRef(
+    gameParams.timeLimit || timeLimit || 45,
+  ).current;
+
+  const [timeLeft, setTimeLeft] = useState(initialTimeLimit);
+  const [grid, setGrid] = useState<GridTile[][]>([]);
   const [status, setStatus] = useState<"playing" | "won" | "lost">("playing");
-  const [errorCount, setErrorCount] = useState(0);
-  const [erroredNodes, setErroredNodes] = useState<{
-    left: number | null;
-    right: number | null;
-  }>({ left: null, right: null });
-
-  // Difficulty parameters
-  const wireCount = gameParams.wireCount || 6;
-  const shuffleSpeed = gameParams.shuffleSpeed || 5000;
-  const maxErrors = gameParams.maxMistakes || 3;
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const leftRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
-  const rightRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
+  const [startRow, setStartRow] = useState(0);
+  const [endRow, setEndRow] = useState(0);
 
   const successSound = useRef<HTMLAudioElement | null>(null);
   const failedSound = useRef<HTMLAudioElement | null>(null);
-  const connectSound = useRef<HTMLAudioElement | null>(null);
-  const errorSound = useRef<HTMLAudioElement | null>(null);
+  const turnSound = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     successSound.current = new Audio("assets/success.ogg");
     failedSound.current = new Audio("assets/failed.ogg");
-    connectSound.current = new Audio("assets/hover.ogg");
-    errorSound.current = new Audio("assets/error.ogg");
+    turnSound.current = new Audio("assets/hover.ogg");
   }, []);
 
+  // Map Generation
   useEffect(() => {
-    const baseWires = COLORS.slice(0, wireCount).map((c, i) => ({
-      ...c,
-      id: i,
-    }));
-    setLeftWires(
-      [...baseWires]
-        .sort(() => Math.random() - 0.5)
-        .map((w) => ({ id: w.id, color: w.hex, side: "left" })),
-    );
-    setRightWires(
-      [...baseWires]
-        .sort(() => Math.random() - 0.5)
-        .map((w) => ({ id: w.id, color: w.hex, side: "right" })),
+    // 1. Initialize empty grid
+    let newGrid: GridTile[][] = Array.from({ length: rows }, (_, r) =>
+      Array.from({ length: cols }, (_, c) => ({
+        id: `${r}-${c}`,
+        row: r,
+        col: c,
+        type: "EMPTY",
+        rotation: 0,
+        powered: false,
+        isStartNode: false,
+        isEndNode: false,
+      })),
     );
 
+    // 2. Randomly pick start and end rows
+    const sRow = Math.floor(Math.random() * rows);
+    const eRow = Math.floor(Math.random() * rows);
+    setStartRow(sRow);
+    setEndRow(eRow);
+
+    // 3. Generate a mandatory path to ensure it is solvable
+    let currentRow = sRow;
+    let currentCol = 0;
+
+    // We force the path to move right, with random vertical detours
+    const pathCoords: { r: number; c: number }[] = [
+      { r: currentRow, c: currentCol },
+    ];
+
+    while (currentCol < cols - 1 || currentRow !== eRow) {
+      // Decide whether to move right or vertically
+      let moveDir: "RIGHT" | "VERT" = "RIGHT";
+      if (currentCol === cols - 1) {
+        moveDir = "VERT"; // Must move vert to reach eRow at end
+      } else if (currentRow !== eRow && Math.random() > 0.5) {
+        moveDir = "VERT";
+      }
+
+      if (moveDir === "RIGHT") {
+        currentCol++;
+      } else {
+        if (currentRow < eRow) currentRow++;
+        else currentRow--;
+      }
+      pathCoords.push({ r: currentRow, c: currentCol });
+    }
+
+    // Assign tile shapes based on path flow to guarantee a solution
+    for (let i = 0; i < pathCoords.length; i++) {
+      const current = pathCoords[i];
+      const prev =
+        i > 0 ? pathCoords[i - 1] : { r: current.r, c: current.c - 1 }; // fake prev for start
+      const next =
+        i < pathCoords.length - 1
+          ? pathCoords[i + 1]
+          : { r: current.r, c: current.c + 1 }; // fake next for end
+
+      // Determine entry and exit directions relative to current tile
+      let entryDir = -1; // 0: TOP, 1: RIGHT, 2: BOTTOM, 3: LEFT
+      if (prev.r < current.r)
+        entryDir = 0; // Came from top
+      else if (prev.c > current.c)
+        entryDir = 1; // Came from right
+      else if (prev.r > current.r)
+        entryDir = 2; // Came from bottom
+      else if (prev.c < current.c) entryDir = 3; // Came from left
+
+      let exitDir = -1;
+      if (next.r < current.r)
+        exitDir = 0; // Goes top
+      else if (next.c > current.c)
+        exitDir = 1; // Goes right
+      else if (next.r > current.r)
+        exitDir = 2; // Goes bottom
+      else if (next.c < current.c) exitDir = 3; // Goes left
+
+      let reqType: TileDef["type"] = "STRAIGHT";
+
+      if (
+        (entryDir === 1 && exitDir === 3) ||
+        (entryDir === 3 && exitDir === 1) ||
+        (entryDir === 0 && exitDir === 2) ||
+        (entryDir === 2 && exitDir === 0)
+      ) {
+        reqType = "STRAIGHT";
+      } else {
+        reqType = "CORNER";
+      }
+
+      // Randomly upgrade some straight/corners to T-Shapes or Crosses for camouflage
+      if (Math.random() > 0.7) {
+        reqType = Math.random() > 0.5 ? "T_SHAPE" : "CROSS";
+      }
+
+      newGrid[current.r][current.c].type = reqType;
+    }
+
+    // 4. Fill remaining empty spots with random tiles
+    const tileTypes: TileDef["type"][] = ["STRAIGHT", "CORNER", "T_SHAPE"];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (newGrid[r][c].type === "EMPTY") {
+          const randomType =
+            tileTypes[Math.floor(Math.random() * tileTypes.length)];
+          newGrid[r][c].type = randomType;
+        }
+        // Scramble rotations
+        newGrid[r][c].rotation = Math.floor(Math.random() * 4);
+      }
+    }
+
+    // 5. Ensure the start tile connects to the left port by rotating it until currentConnections[3] is true
+    const startTile = newGrid[sRow][0];
+    const def = TILE_DICTIONARY[startTile.type];
+    for (let rot = 0; rot < 4; rot++) {
+      const connections = getRotatedConnections(def.connections, rot);
+      if (connections[3]) {
+        // 3 is LEFT
+        startTile.rotation = rot;
+        break;
+      }
+    }
+
+    setGrid(newGrid);
+  }, [rows, cols]);
+
+  // Timer
+  useEffect(() => {
+    if (status !== "playing") return;
     const interval = setInterval(() => {
-      setTimeLeft((prev) => {
+      setTimeLeft((prev: number) => {
         if (prev <= 1) {
-          handleLose();
+          handleEnd(false);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-
-    // Shuffling logic for right column
-    const shuffleInterval = setInterval(() => {
-      if (status === "playing") {
-        setRightWires((prev) => [...prev].sort(() => Math.random() - 0.5));
-      }
-    }, shuffleSpeed);
-
-    return () => {
-      clearInterval(interval);
-      clearInterval(shuffleInterval);
-    };
+    return () => clearInterval(interval);
   }, [status]);
 
-  const handleLose = () => {
+  const handleEnd = (win: boolean) => {
     if (status !== "playing") return;
-    setStatus("lost");
-    failedSound.current?.play().catch(() => {});
-    fetchNui("hackingEnd", { outcome: false, sessionId });
+    setStatus(win ? "won" : "lost");
+    if (win) {
+      successSound.current?.play().catch(() => {});
+    } else {
+      failedSound.current?.play().catch(() => {});
+    }
+    fetchNui("hackingEnd", { outcome: win, sessionId });
     setTimeout(closeGame, 2500);
   };
 
-  const handleWin = () => {
-    if (status !== "playing") return;
-    setStatus("won");
-    successSound.current?.play().catch(() => {});
-    fetchNui("hackingEnd", { outcome: true, sessionId });
-    setTimeout(closeGame, 2500);
-  };
+  // Perform Power Pathfinding
+  const updatePowerState = useCallback(() => {
+    setGrid((prevGrid) => {
+      // Deep copy grid to reset power
+      let nextGrid = prevGrid.map((row) =>
+        row.map((cell) => ({ ...cell, powered: false })),
+      );
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (draggingWireId !== null && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-    }
-  };
+      if (!nextGrid || nextGrid.length === 0) return prevGrid;
 
-  const startDrag = (id: number) => {
-    if (status !== "playing" || connections[id] !== undefined) return;
-    setDraggingWireId(id);
-    if (connectSound.current) {
-      connectSound.current.currentTime = 0;
-      connectSound.current.play().catch(() => {});
-    }
-  };
+      const visited = new Set<string>();
+      const queue: { r: number; c: number; incomingDir: number }[] = [];
 
-  const endDrag = (targetId: number, targetColor: string) => {
-    if (draggingWireId !== null) {
-      const sourceWire = leftWires.find((w) => w.id === draggingWireId);
-      if (sourceWire) {
-        if (sourceWire.color === targetColor) {
-          // Successfull connection
-          setConnections((prev) => {
-            const newConn = { ...prev, [draggingWireId]: targetId };
-            if (Object.keys(newConn).length === wireCount) handleWin();
-            return newConn;
-          });
-          if (connectSound.current) {
-            connectSound.current.currentTime = 0;
-            connectSound.current.play().catch(() => {});
+      // Power always enters from the left edge of the startRow
+      // So we inject power going RIGHT into the startRow, col 0.
+      // Incoming dir to the first cell is from the LEFT (index 3)
+      queue.push({ r: startRow, c: 0, incomingDir: 3 });
+
+      let reachedEnd = false;
+
+      while (queue.length > 0) {
+        const { r, c, incomingDir } = queue.shift()!;
+        if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
+
+        const cellId = `${r}-${c}`;
+        if (visited.has(cellId)) continue;
+
+        const cell = nextGrid[r][c];
+        const def = TILE_DICTIONARY[cell.type];
+        const currentConnections = getRotatedConnections(
+          def.connections,
+          cell.rotation,
+        );
+
+        // Check if the cell can receive power from the incoming direction
+        if (currentConnections[incomingDir]) {
+          cell.powered = true;
+          visited.add(cellId);
+
+          // If this is the end cell on the final column, check if power can EXIT to the right
+          if (c === cols - 1 && r === endRow) {
+            if (currentConnections[1]) {
+              // Exiting Right
+              reachedEnd = true;
+            }
           }
-        } else {
-          // Wrong connection
-          setErrorCount((prev) => {
-            const next = prev + 1;
-            if (next >= maxErrors) handleLose();
-            return next;
-          });
 
-          // Visual Feedback - Localized Shake
-          setErroredNodes({ left: draggingWireId, right: targetId });
-          if (errorSound.current) {
-            errorSound.current.currentTime = 0;
-            errorSound.current.play().catch(() => {});
-          }
-          setTimeout(() => setErroredNodes({ left: null, right: null }), 500);
+          // Propagate power to adjacent connected cells
+          // Check flow relative to self
+          // 0: TOP, goes to r-1, c (incoming for them is BOTTOM/2)
+          if (currentConnections[0])
+            queue.push({ r: r - 1, c, incomingDir: 2 });
+          // 1: RIGHT, goes to r, c+1 (incoming for them is LEFT/3)
+          if (currentConnections[1])
+            queue.push({ r, c: c + 1, incomingDir: 3 });
+          // 2: BOTTOM, goes to r+1, c (incoming for them is TOP/0)
+          if (currentConnections[2])
+            queue.push({ r: r + 1, c, incomingDir: 0 });
+          // 3: LEFT, goes to r, c-1 (incoming for them is RIGHT/1)
+          if (currentConnections[3])
+            queue.push({ r, c: c - 1, incomingDir: 1 });
         }
       }
+
+      if (reachedEnd && status === "playing") {
+        handleEnd(true);
+      }
+
+      return nextGrid;
+    });
+  }, [cols, rows, startRow, endRow, status]);
+
+  // Run pathfinding on initial mount and when grid changes manually (via rotation)
+  useEffect(() => {
+    if (grid.length > 0 && status === "playing") {
+      updatePowerState();
     }
-    setDraggingWireId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startRow, endRow]); // Only strictly depend on dimensions or setup, rotation triggers it manually
+
+  const handleTileClick = (r: number, c: number) => {
+    if (status !== "playing") return;
+
+    if (turnSound.current) {
+      turnSound.current.currentTime = 0;
+      turnSound.current.play().catch(() => {});
+    }
+
+    setGrid((prev) => {
+      const next = [...prev];
+      next[r] = [...next[r]];
+      next[r][c] = { ...next[r][c], rotation: (next[r][c].rotation + 1) % 4 };
+      return next;
+    });
+
+    // We need to defer the pathfinding slightly to ensure state is updated, or we can just trigger it.
+    // Easiest is to queue a microtask or useEffect, but we can also just call our useCallback that uses functional state updates.
+    setTimeout(() => updatePowerState(), 10);
   };
 
-  const getCoords = (side: "left" | "right", id: number) => {
-    const el = side === "left" ? leftRefs.current[id] : rightRefs.current[id];
-    const container = containerRef.current;
-    if (el && container) {
-      const rect = el.getBoundingClientRect();
-      const cRect = container.getBoundingClientRect();
-      const x =
-        side === "left"
-          ? rect.right - cRect.left - 10
-          : rect.left - cRect.left + 10;
-      return { x, y: rect.top - cRect.top + rect.height / 2 };
-    }
-    return { x: 0, y: 0 };
-  };
+  // SVG Render helpers for tiles
+  const renderTileSVG = (type: TileDef["type"], powered: boolean) => {
+    const strokeColor = powered ? "#00f2ff" : "#333";
+    const strokeWidth = powered ? 8 : 4;
+    const glowStr = powered ? "drop-shadow(0 0 6px currentColor)" : "none";
 
-  const isErrorActive =
-    erroredNodes.left !== null || erroredNodes.right !== null;
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        className="tile-svg"
+        style={{ filter: glowStr, color: strokeColor }}
+      >
+        {/* Base background port caps */}
+        <circle
+          cx="50"
+          cy="50"
+          r="15"
+          fill="#111"
+          stroke="#222"
+          strokeWidth="2"
+        />
+
+        {type === "STRAIGHT" && (
+          <line
+            x1="0"
+            y1="50"
+            x2="100"
+            y2="50"
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+          />
+        )}
+        {type === "CORNER" && (
+          <path
+            d="M 50 0 C 50 50, 50 50, 100 50"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+          />
+        )}
+        {type === "T_SHAPE" && (
+          <>
+            <line
+              x1="0"
+              y1="50"
+              x2="100"
+              y2="50"
+              stroke="currentColor"
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+            />
+            <line
+              x1="50"
+              y1="50"
+              x2="50"
+              y2="0"
+              stroke="currentColor"
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+            />
+          </>
+        )}
+        {type === "CROSS" && (
+          <>
+            <line
+              x1="0"
+              y1="50"
+              x2="100"
+              y2="50"
+              stroke="currentColor"
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+            />
+            <line
+              x1="50"
+              y1="0"
+              x2="50"
+              y2="100"
+              stroke="currentColor"
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+            />
+          </>
+        )}
+        <circle cx="50" cy="50" r="8" fill={powered ? "#fff" : "#222"} />
+      </svg>
+    );
+  };
 
   return (
-    <div
-      className="wirefix-wrapper"
-      onMouseMove={handleMouseMove}
-      onMouseUp={() => setDraggingWireId(null)}
-    >
+    <div className="wirefix-wrapper">
       <motion.div
         className="wirefix-laptop-frame"
         initial={{ opacity: 0, scale: 0.9, rotateX: 20, y: 50 }}
@@ -205,16 +440,14 @@ const WireFixGame: React.FC = () => {
           className="laptop-frame-img"
         />
 
-        <div
-          className={`wirefix-container crt-effect ${isErrorActive ? "glitch-shake" : ""}`}
-        >
+        <div className="wirefix-container crt-effect">
           <div className="wirefix-header">
             <div className="header-left">
               <h2 className="panel-title">
-                {wireLocale.title || "NEURAL LINK RESTORATION"}
+                {wireLocale.title || "POWER GRID OVERRIDE"}
               </h2>
               <div className="status-badge">
-                {status === "playing" ? "ANALYZING_NODES..." : "SESSION_END"}
+                {status === "playing" ? "ROUTING_CURRENT..." : "SESSION_END"}
               </div>
             </div>
 
@@ -222,123 +455,80 @@ const WireFixGame: React.FC = () => {
               {timeLeft}s
             </div>
 
-            <div className="error-panel" style={{ justifySelf: "end" }}>
-              <span className="error-label">SIGNAL ERRORS:</span>
-              <div className="error-dots">
-                {Array.from({ length: maxErrors }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`error-dot ${i < errorCount ? "active" : ""}`}
-                  />
-                ))}
-              </div>
+            <div className="system-id" style={{ justifySelf: "end" }}>
+              SYS_PWR_GRID_V1
             </div>
           </div>
 
-          <div className="wirefix-board" ref={containerRef}>
-            <svg className="wire-canvas">
-              {Object.entries(connections).map(([leftId, rightId]) => {
-                const start = getCoords("left", parseInt(leftId));
-                const end = getCoords("right", rightId);
-                const color = leftWires.find(
-                  (w) => w.id === parseInt(leftId),
-                )?.color;
-                return (
-                  <motion.path
-                    key={leftId}
-                    initial={{ pathLength: 0, opacity: 0 }}
-                    animate={{ pathLength: 1, opacity: 1 }}
-                    d={`M ${start.x} ${start.y} C ${start.x + 80} ${start.y}, ${end.x - 80} ${end.y}, ${end.x} ${end.y}`}
-                    stroke={color}
-                    className="wire-path active"
-                  />
-                );
-              })}
-              {draggingWireId !== null && (
-                <path
-                  d={`M ${getCoords("left", draggingWireId).x} ${getCoords("left", draggingWireId).y} C ${getCoords("left", draggingWireId).x + 80} ${getCoords("left", draggingWireId).y}, ${mousePos.x - 40} ${mousePos.y}, ${mousePos.x} ${mousePos.y}`}
-                  className="wire-path dragging"
-                  stroke={leftWires.find((w) => w.id === draggingWireId)?.color}
-                />
-              )}
-            </svg>
-
-            <div className="wire-column">
-              {leftWires.map((wire) => (
+          <div className="grid-play-area">
+            {/* Power Generator Source */}
+            <div className="side-port generator-port">
+              {Array.from({ length: rows }).map((_, i) => (
                 <div
-                  key={wire.id}
-                  ref={(el) => {
-                    leftRefs.current[wire.id] = el;
-                  }}
-                  className={`connector ${connections[wire.id] !== undefined ? "connected" : ""} ${erroredNodes.left === wire.id ? "node-error-shake" : ""}`}
-                  style={{ color: wire.color }}
-                  onMouseDown={() => startDrag(wire.id)}
+                  key={`gen-${i}`}
+                  className={`external-node ${startRow === i ? "active-source" : ""}`}
                 >
-                  <svg className="node-svg" viewBox="0 0 100 100">
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="35"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="8"
-                      strokeDasharray="15 10"
-                    />
-                    <circle cx="50" cy="50" r="15" fill="currentColor" />
-                  </svg>
+                  <div className="node-glow" />
                 </div>
               ))}
             </div>
 
-            <div className="wire-column">
-              <AnimatePresence mode="popLayout">
-                {rightWires.map((wire) => (
-                  <motion.div
-                    key={wire.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 400,
-                      damping: 30,
-                      mass: 1,
-                    }}
-                    ref={(el) => {
-                      rightRefs.current[wire.id] = el;
-                    }}
-                    className={`connector ${Object.values(connections).includes(wire.id) ? "connected" : ""} ${erroredNodes.right === wire.id ? "node-error-shake" : ""}`}
-                    style={{ color: wire.color }}
-                    onMouseUp={() => endDrag(wire.id, wire.color)}
+            <div
+              className="circuit-board"
+              style={{
+                gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                gridTemplateRows: `repeat(${rows}, 1fr)`,
+              }}
+            >
+              {grid.map((row, rIdx) =>
+                row.map((cell, cIdx) => (
+                  <div
+                    key={cell.id}
+                    className={`circuit-tile ${cell.powered ? "powered" : ""}`}
+                    onClick={() => handleTileClick(rIdx, cIdx)}
                   >
-                    <svg className="node-svg" viewBox="0 0 100 100">
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="35"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="8"
-                      />
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="20"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                    </svg>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                    <motion.div
+                      className="tile-rotator"
+                      animate={{ rotate: cell.rotation * 90 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 20,
+                      }}
+                    >
+                      {renderTileSVG(cell.type, cell.powered)}
+                    </motion.div>
+                  </div>
+                )),
+              )}
+            </div>
+
+            <div className="side-port output-port">
+              {Array.from({ length: rows }).map((_, i) => (
+                <div
+                  key={`out-${i}`}
+                  className={`external-node ${endRow === i ? "target-sink" : ""}`}
+                  style={{
+                    borderColor: endRow === i ? "#ffcc00" : "",
+                    boxShadow:
+                      endRow === i ? "0 0 15px rgba(255, 204, 0, 0.5)" : "",
+                  }}
+                >
+                  <div
+                    className="node-glow"
+                    style={{ display: endRow === i ? "block" : "none" }}
+                  />
+                </div>
+              ))}
             </div>
           </div>
 
-          <p className="warning-text">
-            {wireLocale.warning_text || "VOLTAGE CRITICAL - ALIGN NEURAL PATHS"}
-          </p>
+          <div className="bottom-hud container-glass">
+            <span className="hint-text blink-text">
+              {wireLocale.warning ||
+                "CLICK TILES TO ROTATE CIRCUITS. CONNECT SOURCE TO OUTPUT."}
+            </span>
+          </div>
 
           <AnimatePresence>
             {(status === "won" || status === "lost") && (
@@ -354,14 +544,13 @@ const WireFixGame: React.FC = () => {
                 >
                   <h1>
                     {status === "won"
-                      ? wireLocale.success_title || "LINK ESTABLISHED"
-                      : wireLocale.fail_title || "SYSTEM CRITICAL"}
+                      ? wireLocale.won || "POWER RESTORED"
+                      : wireLocale.lost || "SHORT CIRCUIT"}
                   </h1>
                   <p>
                     {status === "won"
-                      ? wireLocale.success_desc ||
-                        "NEURAL CONNECTION SUCCESSFUL"
-                      : wireLocale.fail_desc || "CONNECTION TERMINATED BY HOST"}
+                      ? wireLocale.won_sub || "SYSTEM ONLINE"
+                      : wireLocale.lost_sub || "CONNECTION TERMINATED"}
                   </p>
                 </motion.div>
               </motion.div>
@@ -369,6 +558,12 @@ const WireFixGame: React.FC = () => {
           </AnimatePresence>
         </div>
       </motion.div>
+      {debug && status === "playing" && (
+        <div className="debug-controls">
+          <button onClick={() => handleEnd(true)}>DEBUG: WIN</button>
+          <button onClick={() => handleEnd(false)}>DEBUG: FAIL</button>
+        </div>
+      )}
     </div>
   );
 };

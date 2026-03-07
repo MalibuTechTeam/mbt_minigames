@@ -1,0 +1,51 @@
+.laptop-frame-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.laptop-frame-container {
+  position: relative;
+  height: 90vh; /* 90% of viewport height */
+  width: auto;
+  aspect-ratio: 1920 / 1080;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-width: 95vw; /* Ensure it also fits horizontally */
+}
+
+.laptop-frame-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+.screen-content-mount {
+  position: absolute;
+  top: 8.06%;
+  left: 18.28%;
+  width: 63.39%;
+  height: 70.09%;
+  background: #050505;
+  overflow: hidden;
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.9);
+  z-index: 1;
+}
