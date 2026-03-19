@@ -1,313 +1,314 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { useMinigameStore } from "../../store/useMinigameStore";
 import { fetchNui } from "../../utils/fetchNui";
 import { motion, AnimatePresence } from "framer-motion";
-import LaptopFrame from "./LaptopFrame";
 import "./HackingGame.css";
 
-const BootSequence: React.FC<{
-  onComplete: () => void;
-  hackingLocale: any;
-}> = ({ onComplete, hackingLocale }) => {
-  const [lines, setLines] = useState<string[]>([]);
-
-  useEffect(() => {
-    const bootLines = hackingLocale.boot_lines || [
-      "[ KERNEL ] LOADING NEURAL MODULES...",
-      "[ MEMORY ] INTEG_CHECK: 0x5F3A... PASS",
-      "[ NET ] BYPASSING FIREWALL (PORT 8080)...",
-      "[ SEC ] DECRYPTING NODES: 0x4F2A, 0xBC12...",
-      "[ SYSTEM ] INITIALIZING INTERFACE...",
-      "[ READY ] SYSTEM OVERRIDE ACTIVE.",
-    ];
-
-    let currentLine = 0;
-    const addLine = () => {
-      if (currentLine < bootLines.length) {
-        setLines((prev) => [...prev, bootLines[currentLine]]);
-        currentLine++;
-        // Random delay between lines to simulate processing
-        setTimeout(addLine, Math.random() * 300 + 100);
-      } else {
-        setTimeout(onComplete, 800);
-      }
-    };
-
-    const timer = setTimeout(addLine, 100);
-    return () => clearTimeout(timer);
-  }, [onComplete, hackingLocale]);
-
-  return (
-    <div className="boot-sequence">
-      {lines.map((line, i) => (
-        <div key={i} className="boot-line">
-          {line}
-        </div>
-      ))}
-      <motion.div
-        animate={{ opacity: [1, 0] }}
-        transition={{ duration: 0.1, repeat: Infinity }}
-        className="boot-cursor"
-      >
-        _
-      </motion.div>
-    </div>
-  );
-};
+// Interface for a grid cell
+interface HackingCell {
+  id: string;
+  char: string;
+  isTarget: boolean;
+  isFound: boolean;
+  row: number;
+  col: number;
+}
 
 const HackingGame: React.FC = () => {
   const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
     useMinigameStore();
-  const hackingLocale = locale?.hacking || {};
-  const [timeLeft, setTimeLeft] = useState(timeLimit || 35);
-  const [gridItems, setGridItems] = useState<string[]>([]);
-  const [wantedItems, setWantedItems] = useState<string[]>([]);
-  const [foundItems, setFoundItems] = useState<string[]>([]);
-  const [isBooting, setIsBooting] = useState(true);
-  const [status, setStatus] = useState<"playing" | "won" | "lost">("playing");
-  const [wrongIndex, setWrongIndex] = useState<number | null>(null);
-  const [mistakes, setMistakes] = useState(0);
-  const maxMistakes = gameParams.maxMistakes || 4;
-  const sequenceLength = gameParams.sequenceLength || 5;
-  const [displaySessionId] = useState(
-    Math.random().toString(36).substring(7).toUpperCase(),
-  );
+  const hackLocale = locale?.hacking || {};
 
-  // Sound refs using local assets - relative path for production build
+  // Game Settings from params
+  // Difficulty: totalBlocks (how many numbers to find)
+  const totalBlocks = gameParams.totalBlocks || 4;
+  const initialTimeLimit = useRef(
+    gameParams.timeLimit || timeLimit || 30,
+  ).current;
+
+  // Constants
+  const GRID_SIZE = 10;
+  const CHARS = "0123456789ABCDEF";
+
+  // State
+  const [grid, setGrid] = useState<HackingCell[][]>([]);
+  const [timeLeft, setTimeLeft] = useState(initialTimeLimit);
+  const [status, setStatus] = useState<"playing" | "won" | "lost">("playing");
+  const [foundBlocks, setFoundBlocks] = useState(0);
+  const [mistakes, setMistakes] = useState(0);
+  const [activeSquare, setActiveSquare] = useState({ r: 0, c: 0 }); // Current player "cursor"
+
+  const successSound = useRef<HTMLAudioElement | null>(null);
+  const failedSound = useRef<HTMLAudioElement | null>(null);
   const hoverSound = useRef<HTMLAudioElement | null>(null);
-  const clickSound = useRef<HTMLAudioElement | null>(null);
   const errorSound = useRef<HTMLAudioElement | null>(null);
-  const winSound = useRef<HTMLAudioElement | null>(null);
-  const loseSound = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    successSound.current = new Audio("assets/success.ogg");
+    failedSound.current = new Audio("assets/failed.ogg");
     hoverSound.current = new Audio("assets/hover.ogg");
-    clickSound.current = new Audio("assets/hover.ogg");
-    errorSound.current = new Audio("assets/error.ogg");
-    winSound.current = new Audio("assets/success.ogg");
-    loseSound.current = new Audio("assets/failed.ogg");
+    errorSound.current = new Audio("assets/failed.ogg"); // Reuse failed for quick error beep
   }, []);
 
-  useEffect(() => {
-    const hex = "0123456789ABCDEF";
-    const generateHex = () =>
-      Array.from({ length: 2 }, () => hex[Math.floor(Math.random() * 16)]).join(
-        "",
-      );
-    const newGrid = Array.from({ length: 64 }, generateHex);
-    const newWanted = Array.from(
-      { length: sequenceLength },
-      () => newGrid[Math.floor(Math.random() * 64)],
-    );
+  const handleEnd = useCallback(
+    (win: boolean) => {
+      if (status !== "playing") return;
+      setStatus(win ? "won" : "lost");
 
-    setGridItems(newGrid);
-    setWantedItems(newWanted);
-    setFoundItems([]);
-    setTimeLeft(timeLimit || 35);
+      if (win) {
+        successSound.current?.play().catch(() => {});
+      } else {
+        failedSound.current?.play().catch(() => {});
+      }
 
-    const bootTimer = setTimeout(() => setIsBooting(false), 2000);
-    return () => clearTimeout(bootTimer);
-  }, [timeLimit, sequenceLength]);
+      fetchNui("hackingEnd", { outcome: win, sessionId });
 
-  useEffect(() => {
-    if (
-      status === "playing" &&
-      !isBooting &&
-      timeLeft > 0 &&
-      foundItems.length < wantedItems.length
-    ) {
-      const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-      return () => clearInterval(timer);
-    } else if (timeLeft === 0 && status === "playing") {
+      // Removed window.location.reload() which causes lag.
+      // Use the standard closeGame after a delay to show success/fail screen.
+      setTimeout(() => {
+        closeGame();
+      }, 2500);
+    },
+    [status, sessionId, closeGame],
+  );
+
+  const triggerMistake = useCallback(() => {
+    if (status !== "playing") return;
+    setMistakes((prev: number) => prev + 1);
+    errorSound.current?.play().catch(() => {});
+
+    // Optional: add shake effect or penalty
+    if (mistakes >= 2) {
+      // 3 strikes you're out
       handleEnd(false);
     }
-  }, [status, isBooting, timeLeft, foundItems.length, wantedItems.length]);
+  }, [status, mistakes, handleEnd]);
 
-  const handleItemClick = (item: string, index: number) => {
-    if (status !== "playing" || isBooting) return;
-
-    if (item === wantedItems[foundItems.length]) {
-      if (clickSound.current) {
-        clickSound.current.currentTime = 0;
-        clickSound.current.play().catch(() => {});
+  // Initial Grid Generation
+  useEffect(() => {
+    const newGrid: HackingCell[][] = [];
+    // 1. Fill with random junk
+    for (let r = 0; r < GRID_SIZE; r++) {
+      const row: HackingCell[] = [];
+      for (let c = 0; c < GRID_SIZE; c++) {
+        row.push({
+          id: `${r}-${c}`,
+          char: CHARS[Math.floor(Math.random() * CHARS.length)],
+          isTarget: false,
+          isFound: false,
+          row: r,
+          col: c,
+        });
       }
-      const newFound = [...foundItems, item];
-      setFoundItems(newFound);
-      if (newFound.length === wantedItems.length) {
+      newGrid.push(row);
+    }
+
+    // 2. Place target blocks
+    let placed = 0;
+    while (placed < totalBlocks) {
+      const r = Math.floor(Math.random() * GRID_SIZE);
+      const c = Math.floor(Math.random() * GRID_SIZE);
+      if (!newGrid[r][c].isTarget) {
+        newGrid[r][c].isTarget = true;
+        placed++;
+      }
+    }
+
+    setGrid(newGrid);
+  }, [totalBlocks]);
+
+  // Timer logic - fixed to avoid multiple intervals and race conditions
+  useEffect(() => {
+    if (status !== "playing") return;
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev: number) => {
+        if (status !== "playing") return prev;
+        if (prev <= 1) {
+          handleEnd(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [status, handleEnd]);
+
+  const handleCellClick = (r: number, c: number) => {
+    if (status !== "playing") return;
+
+    hoverSound.current?.play().catch(() => {});
+    setActiveSquare({ r, c });
+
+    const cell = grid[r][c];
+    if (cell.isTarget && !cell.isFound) {
+      const newGrid = [...grid];
+      newGrid[r][c].isFound = true;
+      setGrid(newGrid);
+
+      const newCount = foundBlocks + 1;
+      setFoundBlocks(newCount);
+
+      if (newCount === totalBlocks) {
         handleEnd(true);
       }
-    } else {
-      if (errorSound.current) {
-        errorSound.current.currentTime = 0;
-        errorSound.current.play().catch(() => {});
-      }
-      setWrongIndex(index);
-
-      const newMistakes = mistakes + 1;
-      setMistakes(newMistakes);
-
-      if (newMistakes >= maxMistakes) {
-        handleEnd(false);
-      }
-
-      setTimeout(() => setWrongIndex(null), 500);
+    } else if (!cell.isTarget) {
+      triggerMistake();
     }
   };
 
-  const handleEnd = (success: boolean) => {
-    setStatus(success ? "won" : "lost");
-    fetchNui("hackingEnd", { outcome: success, sessionId });
-    if (success) {
-      // Play success sound
-      const aud = new Audio("assets/success.ogg");
-      aud.play().catch(() => {});
-      setTimeout(closeGame, 2000);
-    } else {
-      // Play fail sound
-      const aud = new Audio("assets/failed.ogg");
-      aud.play().catch(() => {});
-      setTimeout(() => {
-        window.location.reload(); // Reload or close? User said remove button. Reload seems appropriate for retry, or closeGame if they should fail out. Usually fail out.
-        // Actually, if failed, they might need to restart somewhat?
-        // User said "remove button when minigame ends and show access denied text in center of console".
-        // I'll leave it showing then close or let them reload? "far uscire la scritta... e non a destra fuori"
-        // I'll show the text, then close after a delay maybe? Or just leave it?
-        // Usually minigames close on fail. I'll setup a timeout to closeGame after showing result.
-        setTimeout(closeGame, 3000);
-      }, 3000);
-    }
-  };
+  // Keyboard Navigation
+  useEffect(() => {
+    if (status !== "playing") return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      setActiveSquare((prev) => {
+        let { r, c } = prev;
+        if (e.key === "ArrowUp") r = Math.max(0, r - 1);
+        else if (e.key === "ArrowDown") r = Math.min(GRID_SIZE - 1, r + 1);
+        else if (e.key === "ArrowLeft") c = Math.max(0, c - 1);
+        else if (e.key === "ArrowRight") c = Math.min(GRID_SIZE - 1, c + 1);
+        else if (e.key === "Enter") {
+          handleCellClick(r, c);
+          return prev;
+        } else return prev;
+
+        return { r, c };
+      });
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [status, grid, foundBlocks]); // Add dependencies to avoid closures
 
   return (
-    <LaptopFrame>
-      <div className="screen-effects">
-        <div className="scanlines"></div>
-        <div className="screen-smudge"></div>
-        <div className="crt-flicker"></div>
-      </div>
+    <div className="hacking-wrapper">
+      <motion.div
+        className="hacking-laptop-frame"
+        initial={{ opacity: 0, scale: 0.9, y: 50 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.8, y: -50 }}
+      >
+        <img
+          src="assets/laptop-frame.svg"
+          alt="Laptop Frame"
+          className="laptop-frame-img"
+        />
+        <div className="hacking-container crt-effect">
+          {/* Header */}
+          <div className="hacking-header">
+            <div className="header-left">
+              <span className="system-label">
+                {hackLocale.system_label || "SYSTEM OVERRIDE"}
+              </span>
+              <div className="header-title">
+                {hackLocale.title || "DECRYPT_X-77"}
+              </div>
+            </div>
 
-      <AnimatePresence mode="wait">
-        {status !== "playing" ? (
-          <motion.div
-            key="result"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            className={`result-overlay-screen ${status}`}
-          >
-            <motion.div
-              initial={{ y: 20 }}
-              animate={{ y: 0 }}
-              className="result-content"
-            >
-              <h2 className="glitch-text">
-                {status === "won"
-                  ? hackingLocale.granted || "ACCESS GRANTED"
-                  : hackingLocale.denied || "ACCESS DENIED"}
-              </h2>
-              <div className="status-line"></div>
-              <p>
-                {status === "won"
-                  ? hackingLocale.granted_sub || "SYSTEM OVERRIDE COMPLETE"
-                  : hackingLocale.denied_sub || "SECURITY PROTOCOL TRIGGERED"}
-              </p>
-            </motion.div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="game"
-            className="game-window"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            {isBooting ? (
-              <BootSequence
-                onComplete={() => setIsBooting(false)}
-                hackingLocale={hackingLocale}
-              />
-            ) : (
-              <>
-                <div className="window-header">
-                  <div className="header-left">
-                    <span className="terminal-path">
-                      {hackingLocale.title || "TERMINAL NODE DECRYPTION"}
-                    </span>
-                  </div>
-                  <div className="header-right">
-                    <span>user@mbt-osc ~ /session_{displaySessionId}</span>
-                    <motion.span
-                      animate={{ opacity: [0, 1, 0] }}
-                      transition={{ duration: 1, repeat: Infinity }}
-                      className="cursor"
-                    >
-                      _
-                    </motion.span>
-                  </div>
-                  <div
-                    className="mistakes-counter"
-                    style={{
-                      color: mistakes >= maxMistakes - 1 ? "red" : "#fff",
-                      marginLeft: "10px",
-                    }}
+            <div className={`hacking-timer ${timeLeft < 5 ? "critical" : ""}`}>
+              <span className="timer-label">
+                {hackLocale.timer_label || "TTL"}
+              </span>
+              <span className="time-val">{timeLeft}s</span>
+            </div>
+
+            <div className="mistakes-tracker">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`mistake-dot ${i < mistakes ? "active" : ""}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Grid View */}
+          <div className="hacking-grid">
+            {grid.map((row, rIdx) => (
+              <div key={rIdx} className="grid-row">
+                {row.map((cell, cIdx) => (
+                  <motion.div
+                    key={cell.id}
+                    className={`grid-cell ${cell.isFound ? "found" : ""} ${activeSquare.r === rIdx && activeSquare.c === cIdx ? "active" : ""}`}
+                    onClick={() => handleCellClick(rIdx, cIdx)}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
                   >
-                    ERRORS: {mistakes}/{maxMistakes}
-                  </div>
-                </div>
+                    {cell.char}
+                  </motion.div>
+                ))}
+              </div>
+            ))}
+          </div>
 
-                <div className="instruction-strip">
-                  {hackingLocale.instruction ||
-                    "IDENTIFY SEQUENCE PATTERN IN DESIGNATED ORDER"}
-                </div>
+          {/* Footer UI */}
+          <div className="hacking-footer">
+            <div className="progress-bar-container">
+              <div className="progress-label">
+                {hackLocale.progress || "DECRYPTION PROGRESS"}
+              </div>
+              <div className="progress-bar-bg">
+                <motion.div
+                  className="progress-bar-fill"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(foundBlocks / totalBlocks) * 100}%` }}
+                />
+              </div>
+            </div>
+            <div className="status-message blink-text">
+              {status === "playing"
+                ? hackLocale.scanning || "SCANNING FOR VULNERABILITIES..."
+                : "CONNECTION LOST"}
+            </div>
+          </div>
 
-                <div className="hacking-layout">
-                  <div className="grid-container">
-                    {gridItems.map((item, idx) => (
-                      <motion.div
-                        key={idx}
-                        className={`hacking-grid-item ${foundItems.includes(item) ? "selected" : ""} ${idx === wrongIndex ? "wrong" : ""}`}
-                        onClick={() => handleItemClick(item, idx)}
-                        onMouseEnter={() => {
-                          if (hoverSound.current) {
-                            hoverSound.current.currentTime = 0;
-                            hoverSound.current.play().catch(() => {});
-                          }
-                        }}
-                      >
-                        {item}
-                      </motion.div>
-                    ))}
+          <AnimatePresence>
+            {(status === "won" || status === "lost") && (
+              <motion.div
+                className="hacking-status-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <motion.div
+                  className={`status-card ${status}`}
+                  initial={{ scale: 0.5, y: 100 }}
+                  animate={{ scale: 1, y: 0 }}
+                >
+                  <div className="card-inner">
+                    <h1>
+                      {status === "won"
+                        ? hackLocale.access_granted || "ACCESS GRANTED"
+                        : hackLocale.access_denied || "ACCESS DENIED"}
+                    </h1>
+                    <div className="card-divider" />
+                    <p>
+                      {status === "won"
+                        ? hackLocale.success_sub || "ENCRYPTION KEYS EXTRACTED"
+                        : hackLocale.failed_sub ||
+                          "FIREWALL COUNTER-MEASURES ACTIVE"}
+                    </p>
                   </div>
-
-                  <div className="hacking-sidebar">
-                    <div className="sidebar-title">
-                      {hackingLocale.target_label || "TARGET SEQUENCE"}
-                    </div>
-                    <div className="wanted-sequence">
-                      {wantedItems.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className={`sequence-item ${idx < foundItems.length ? "found" : idx === foundItems.length ? "active" : "pending"}`}
-                        >
-                          {item}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="timer-box">{timeLeft}s</div>
-                  </div>
-                </div>
-              </>
+                </motion.div>
+              </motion.div>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </AnimatePresence>
+        </div>
+      </motion.div>
+
       {debug && status === "playing" && (
         <div className="debug-controls">
           <button onClick={() => handleEnd(true)}>DEBUG: WIN</button>
           <button onClick={() => handleEnd(false)}>DEBUG: FAIL</button>
         </div>
       )}
-    </LaptopFrame>
+    </div>
   );
 };
 

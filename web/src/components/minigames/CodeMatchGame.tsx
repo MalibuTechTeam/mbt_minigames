@@ -40,24 +40,6 @@ const CodeMatchGame: React.FC = () => {
   const missedRef = useRef<Record<number, boolean>>({});
   const currentTargetIndexRef = useRef(0);
 
-  // Difficulty parameters
-  const segmentCount = gameParams.segmentCount || 5;
-  const maxMistakes = gameParams.maxMistakes || 3;
-  const shiftSpeed = gameParams.shiftSpeed || 800; // ms
-
-  const targetCode = targets[currentTargetIndex]?.code || "----";
-
-  // Physics constraints
-  const ITEM_HEIGHT_VH = 8;
-  const START_OFFSET_VH = 40;
-  const SCANNER_CENTER_VH = 20;
-
-  const SPEED_ITEMS_PER_SEC = 1000 / shiftSpeed;
-  const SPEED_VH_PER_SEC = SPEED_ITEMS_PER_SEC * ITEM_HEIGHT_VH;
-  const DISTANCE_TO_SCANNER_VH =
-    START_OFFSET_VH + ITEM_HEIGHT_VH / 2 - SCANNER_CENTER_VH;
-  const TIME_TO_SCANNER_SEC = DISTANCE_TO_SCANNER_VH / SPEED_VH_PER_SEC;
-
   // Refs for audio
   const findSound = useRef<HTMLAudioElement | null>(null);
   const errorSound = useRef<HTMLAudioElement | null>(null);
@@ -71,122 +53,21 @@ const CodeMatchGame: React.FC = () => {
     loseSound.current = new Audio("assets/failed.ogg");
   }, []);
 
-  const generateRandomCode = () => {
-    let code = "";
-    for (let i = 0; i < 4; i++) {
-      code += CHARS[Math.floor(Math.random() * CHARS.length)];
-    }
-    return code;
-  };
+  // Difficulty parameters
+  const segmentCount = gameParams.segmentCount || 5;
+  const maxMistakes = gameParams.maxMistakes || 3;
+  const shiftSpeed = gameParams.shiftSpeed || 800; // ms
 
-  const generateStreamItem = (forcedCode?: string): StreamItem => {
-    globalIdCounter.current++;
-    const code = forcedCode || generateRandomCode();
-    const address = `0x${globalIdCounter.current.toString(16).padStart(4, "0").toUpperCase()}`;
-    return {
-      id: `item-${globalIdCounter.current}`,
-      code,
-      address,
-    };
-  };
+  // Physics constraints
+  const ITEM_HEIGHT_VH = 8;
+  const START_OFFSET_VH = 40;
+  const SCANNER_CENTER_VH = 20;
 
-  // Initialize game
-  useEffect(() => {
-    if (didInit.current) return;
-    didInit.current = true;
-    globalIdCounter.current = 0;
-
-    const streamSize = Math.ceil(initialTimeLimit * SPEED_ITEMS_PER_SEC) + 5;
-    const newStream = Array.from({ length: streamSize }, () =>
-      generateStreamItem(),
-    );
-
-    const firstTargetTime = Math.max(TIME_TO_SCANNER_SEC + 4, 5); // Give 4-5 seconds lead-in
-    const lastTargetTime = Math.max(firstTargetTime + 1, initialTimeLimit - 3);
-    const timeRange = lastTargetTime - firstTargetTime;
-    const timeStep = segmentCount > 1 ? timeRange / (segmentCount - 1) : 0;
-
-    const newTargets: StreamItem[] = [];
-    for (let i = 0; i < segmentCount; i++) {
-      const targetTime = firstTargetTime + i * timeStep;
-      const targetIndex = Math.max(
-        0,
-        Math.floor((targetTime - TIME_TO_SCANNER_SEC) * SPEED_ITEMS_PER_SEC),
-      );
-      newTargets.push(newStream[targetIndex]);
-    }
-
-    setStream(newStream);
-    setTargets(newTargets);
-  }, [
-    initialTimeLimit,
-    SPEED_ITEMS_PER_SEC,
-    TIME_TO_SCANNER_SEC,
-    segmentCount,
-  ]);
-
-  // physics loop
-  useEffect(() => {
-    if (status !== "playing") return;
-
-    if (startTimeRef.current === undefined) {
-      startTimeRef.current = performance.now();
-    }
-
-    const animate = (time: DOMHighResTimeStamp) => {
-      // Use performance.now() as fallback to guarantee absolute time delta
-      if (startTimeRef.current === undefined) startTimeRef.current = time;
-      const elapsed = time - startTimeRef.current;
-      const currentY = START_OFFSET_VH - (elapsed / 1000) * SPEED_VH_PER_SEC;
-
-      if (containerRef.current) {
-        containerRef.current.style.transform = `translateY(${currentY}vh)`;
-      }
-
-      // Miss Detection Logic
-      if (
-        targets.length > 0 &&
-        currentTargetIndexRef.current < targets.length
-      ) {
-        const currentTarget = targets[currentTargetIndexRef.current];
-        const targetEl = document.getElementById(currentTarget.id);
-        const scanner = document.getElementById("scanner-bracket");
-
-        if (targetEl && scanner) {
-          const scRect = scanner.getBoundingClientRect();
-          const tgRect = targetEl.getBoundingClientRect();
-
-          if (
-            tgRect.bottom < scRect.top - 10 &&
-            !missedRef.current[currentTargetIndexRef.current]
-          ) {
-            missedRef.current[currentTargetIndexRef.current] = true;
-            triggerMistake();
-          }
-        }
-      }
-
-      reqRef.current = requestAnimationFrame(animate);
-    };
-    reqRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (reqRef.current) cancelAnimationFrame(reqRef.current);
-    };
-  }, [status, SPEED_VH_PER_SEC, START_OFFSET_VH]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev: number) => {
-        if (prev <= 1) {
-          handleEnd(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const SPEED_ITEMS_PER_SEC = 1000 / shiftSpeed;
+  const SPEED_VH_PER_SEC = SPEED_ITEMS_PER_SEC * ITEM_HEIGHT_VH;
+  const DISTANCE_TO_SCANNER_VH =
+    START_OFFSET_VH + ITEM_HEIGHT_VH / 2 - SCANNER_CENTER_VH;
+  const TIME_TO_SCANNER_SEC = DISTANCE_TO_SCANNER_VH / SPEED_VH_PER_SEC;
 
   const handleEnd = useCallback(
     (win: boolean) => {
@@ -210,7 +91,7 @@ const CodeMatchGame: React.FC = () => {
       errorSound.current.play().catch(() => {});
     }
 
-    setMistakes((prev) => {
+    setMistakes((prev: number) => {
       const newMistakes = prev + 1;
       if (newMistakes >= maxMistakes) {
         handleEnd(false);
@@ -218,7 +99,7 @@ const CodeMatchGame: React.FC = () => {
         setTimeLeft((t: number) => Math.max(0, t - 2));
         setTimeout(() => setIsError(false), 500);
         // Automatically skip to next target if this was a miss
-        setCurrentTargetIndex((idx) => {
+        setCurrentTargetIndex((idx: number) => {
           const nextIdx = idx + 1;
           currentTargetIndexRef.current = nextIdx;
           return nextIdx;
@@ -281,7 +162,132 @@ const CodeMatchGame: React.FC = () => {
     mistakes,
     segmentCount,
     maxMistakes,
+    triggerMistake,
+    handleEnd,
   ]);
+
+  const targetCode = targets[currentTargetIndex]?.code || "----";
+
+  const generateRandomCode = () => {
+    let code = "";
+    for (let i = 0; i < 4; i++) {
+      code += CHARS[Math.floor(Math.random() * CHARS.length)];
+    }
+    return code;
+  };
+
+  const generateStreamItem = (forcedCode?: string): StreamItem => {
+    globalIdCounter.current++;
+    const code = forcedCode || generateRandomCode();
+    const address = `0x${globalIdCounter.current.toString(16).padStart(4, "0").toUpperCase()}`;
+    return {
+      id: `item-${globalIdCounter.current}`,
+      code,
+      address,
+    };
+  };
+
+  // Initialize game
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+    
+    // Reset refs
+    globalIdCounter.current = 0;
+    missedRef.current = {};
+    currentTargetIndexRef.current = 0;
+    startTimeRef.current = undefined;
+
+    const streamSize = Math.ceil(initialTimeLimit * SPEED_ITEMS_PER_SEC) + 5;
+    const newStream = Array.from({ length: streamSize }, () =>
+      generateStreamItem(),
+    );
+
+    const firstTargetTime = Math.max(TIME_TO_SCANNER_SEC + 4, 5); // Give 4-5 seconds lead-in
+    const lastTargetTime = Math.max(firstTargetTime + 1, initialTimeLimit - 3);
+    const timeRange = lastTargetTime - firstTargetTime;
+    const timeStep = segmentCount > 1 ? timeRange / (segmentCount - 1) : 0;
+
+    const newTargets: StreamItem[] = [];
+    for (let i = 0; i < segmentCount; i++) {
+      const targetTime = firstTargetTime + i * timeStep;
+      const targetIndex = Math.max(
+        0,
+        Math.floor((targetTime - TIME_TO_SCANNER_SEC) * SPEED_ITEMS_PER_SEC),
+      );
+      newTargets.push(newStream[targetIndex]);
+    }
+
+    setStream(newStream);
+    setTargets(newTargets);
+  }, [
+    initialTimeLimit,
+    SPEED_ITEMS_PER_SEC,
+    TIME_TO_SCANNER_SEC,
+    segmentCount,
+  ]);
+
+  // physics loop
+  useEffect(() => {
+    if (status !== "playing") return;
+
+    const animate = (time: DOMHighResTimeStamp) => {
+      if (!startTimeRef.current) startTimeRef.current = time;
+      const elapsed = time - startTimeRef.current;
+      
+      // Calculate scroll position
+      const currentY = START_OFFSET_VH - (elapsed / 1000) * SPEED_VH_PER_SEC;
+
+      // Update transform directly for performance
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translateY(${currentY}vh)`;
+      }
+
+      // Miss Detection Logic
+      if (
+        targets.length > 0 &&
+        currentTargetIndexRef.current < targets.length
+      ) {
+        const currentTarget = targets[currentTargetIndexRef.current];
+        const targetEl = document.getElementById(currentTarget.id);
+        const scanner = document.getElementById("scanner-bracket");
+
+        if (targetEl && scanner) {
+          const scRect = scanner.getBoundingClientRect();
+          const tgRect = targetEl.getBoundingClientRect();
+
+          if (
+            tgRect.bottom < scRect.top - 10 &&
+            !missedRef.current[currentTargetIndexRef.current]
+          ) {
+            missedRef.current[currentTargetIndexRef.current] = true;
+            triggerMistake();
+          }
+        }
+      }
+
+      reqRef.current = requestAnimationFrame(animate);
+    };
+    reqRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (reqRef.current) cancelAnimationFrame(reqRef.current);
+    };
+  }, [status, SPEED_VH_PER_SEC, START_OFFSET_VH, triggerMistake, targets]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev: number) => {
+        if (status !== "playing") return prev;
+        if (prev <= 1) {
+          handleEnd(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status, handleEnd]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
