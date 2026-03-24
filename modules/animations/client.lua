@@ -29,6 +29,7 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
             for _, pDef in ipairs(finalAnimData.PreProps or {}) do
                 local mHash = GetHashKey(pDef.Model)
                 local pObj = CreateObject(mHash, currentCoords.x, currentCoords.y, currentCoords.z, true, true, true)
+                SetModelAsNoLongerNeeded(mHash)
                 table.insert(sceneProps, pObj)
                 if pDef.Bone then
                     Citizen.Wait(0)
@@ -75,6 +76,7 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
         Utils.MbtDebugger("RunSequence: Spawning Prop " .. tostring(pDef.Model) .. " (Hash: " .. tostring(mHash) .. ")")
 
         local pObj = CreateObject(mHash, currentCoords.x, currentCoords.y, currentCoords.z, true, true, true)
+        SetModelAsNoLongerNeeded(mHash)
         SetEntityAsMissionEntity(pObj, true, true)
         table.insert(sceneProps, pObj)
 

@@ -87,6 +87,9 @@ const BoltTurnGame: React.FC = () => {
   // High-performance physics state (Bypassing React Renders)
   const tensionRefs = useRef<number[]>(new Array(boltCount).fill(0));
   const overheatedRef = useRef<boolean[]>(new Array(boltCount).fill(false));
+  const boltProgressRef = useRef<number[]>(new Array(boltCount).fill(0));
+  const mistakesRef = useRef(0);
+  const hasEndedRef = useRef(false);
   const reqRef = useRef<number>(undefined);
   const lastTimeRef = useRef<number>(undefined);
 
@@ -128,7 +131,8 @@ const BoltTurnGame: React.FC = () => {
   }, [status]);
 
   const handleEnd = (win: boolean) => {
-    if (status !== "playing") return;
+    if (hasEndedRef.current) return;
+    hasEndedRef.current = true;
     setStatus(win ? "won" : "lost");
 
     // Stop any looping sounds immediately
@@ -142,7 +146,7 @@ const BoltTurnGame: React.FC = () => {
     } else {
       failedSound.current?.play().catch(() => {});
     }
-    fetchNui("hackingEnd", { outcome: win, sessionId });
+    fetchNui("minigameEnd", { outcome: win, sessionId });
     setTimeout(closeGame, 2500);
   };
 
@@ -161,13 +165,12 @@ const BoltTurnGame: React.FC = () => {
       tensionRefs.current[index] = 0;
       setActiveValve(null);
 
-      setMistakes((prevM) => {
-        const next = prevM + 1;
-        if (next >= maxErrors) {
-          handleEnd(false);
-        }
-        return next;
-      });
+      mistakesRef.current += 1;
+      const nextMistakes = mistakesRef.current;
+      setMistakes(nextMistakes);
+      if (nextMistakes >= maxErrors) {
+        handleEnd(false);
+      }
 
       setErrorLog((prevLogs) => [
         (
@@ -240,7 +243,7 @@ const BoltTurnGame: React.FC = () => {
         let currentTension = tensionRefs.current[i];
         const isOH = overheatedRef.current[i];
 
-        if (!isOH && boltProgress[i] < 100) {
+        if (!isOH && boltProgressRef.current[i] < 100) {
           if (active) {
             currentTension += TENSION_BUILD_RATE * deltaTime;
           } else {
@@ -250,7 +253,7 @@ const BoltTurnGame: React.FC = () => {
 
         currentTension = Math.max(0, currentTension);
 
-        if (currentTension >= MAX_TENSION && !isOH && boltProgress[i] < 100) {
+        if (currentTension >= MAX_TENSION && !isOH && boltProgressRef.current[i] < 100) {
           currentTension = MAX_TENSION;
           triggerOverheat(i);
         }
@@ -306,56 +309,51 @@ const BoltTurnGame: React.FC = () => {
     return () => {
       if (reqRef.current) cancelAnimationFrame(reqRef.current);
     };
-  }, [
-    status,
-    activeValve,
-    overheated,
-    boltCount,
-    heatSpeed,
-    boltProgress,
-    triggerOverheat,
-  ]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, activeValve, boltCount, heatSpeed, triggerOverheat]);
 
   // Progress Checking Loop (React-friendly, 20fps)
   useEffect(() => {
     if (status !== "playing") return;
     const progressTimer = setInterval(() => {
-      setBoltProgress((prev) => {
-        const next = [...prev];
-        let hasChanged = false;
-        let allDone = true;
+      let allDone = true;
+      let hasChanged = false;
 
-        const speedMult = 0.5 * heatSpeed;
-        const baseSin = Math.sin(performance.now() * 0.001 * speedMult);
-        const secondarySin = Math.sin(performance.now() * 0.0023 * speedMult);
-        const sweetSpotCenter = 50 + baseSin * 20 + secondarySin * 10;
-        const ssMin = sweetSpotCenter - SWEET_SPOT_WIDTH / 2;
-        const ssMax = sweetSpotCenter + SWEET_SPOT_WIDTH / 2;
+      const speedMult = 0.5 * heatSpeed;
+      const baseSin = Math.sin(performance.now() * 0.001 * speedMult);
+      const secondarySin = Math.sin(performance.now() * 0.0023 * speedMult);
+      const sweetSpotCenter = 50 + baseSin * 20 + secondarySin * 10;
+      const ssMin = sweetSpotCenter - SWEET_SPOT_WIDTH / 2;
+      const ssMax = sweetSpotCenter + SWEET_SPOT_WIDTH / 2;
 
-        for (let i = 0; i < boltCount; i++) {
-          if (next[i] >= 100 || overheatedRef.current[i]) continue;
-          allDone = false;
+      const next = [...boltProgressRef.current];
 
-          const active = activeValve === i;
-          if (active) {
-            const t = tensionRefs.current[i];
-            if (t >= ssMin && t <= ssMax) {
-              // Award progress
-              next[i] = Math.min(100, next[i] + PROGRESS_BUILD_RATE * 0.05); // 50ms tick
-              hasChanged = true;
-            }
+      for (let i = 0; i < boltCount; i++) {
+        if (next[i] >= 100 || overheatedRef.current[i]) continue;
+        allDone = false;
+
+        const active = activeValve === i;
+        if (active) {
+          const t = tensionRefs.current[i];
+          if (t >= ssMin && t <= ssMax) {
+            next[i] = Math.min(100, next[i] + PROGRESS_BUILD_RATE * 0.05); // 50ms tick
+            hasChanged = true;
           }
         }
+      }
 
-        if (allDone && boltCount > 0) {
-          handleEnd(true);
-        }
-        return hasChanged ? next : prev;
-      });
+      if (hasChanged) {
+        boltProgressRef.current = next;
+        setBoltProgress([...next]);
+      }
+
+      if (allDone && boltCount > 0) {
+        handleEnd(true);
+      }
     }, 50);
 
     return () => clearInterval(progressTimer);
-  }, [status, activeValve, overheated, boltCount, heatSpeed]);
+  }, [status, activeValve, boltCount, heatSpeed, handleEnd]);
 
   const startTurning = (index: number) => {
     if (status !== "playing" || overheated[index] || boltProgress[index] >= 100)
@@ -435,7 +433,7 @@ const BoltTurnGame: React.FC = () => {
           </div>
 
           <div className="main-layout">
-            <div className="side-indicators container-glass">
+            <div className="side-indicators boltturn-glass">
               {/* Dummy overall stability derived from progress */}
               <CurvedGauge
                 value={
@@ -603,7 +601,7 @@ const BoltTurnGame: React.FC = () => {
                 </div>
               ))}
 
-              <div className="side-indicators-right container-glass">
+              <div className="side-indicators-right boltturn-glass">
                 <span className="group-label" style={{ color: "#ff3366" }}>
                   {boltLocale.system_breaches || "CABLE SNAPS"}
                 </span>
@@ -641,7 +639,7 @@ const BoltTurnGame: React.FC = () => {
           </div>
 
           <div className="bottom-hud">
-            <div className="error-log container-glass">
+            <div className="error-log boltturn-glass">
               <div className="log-header">
                 {boltLocale.log_header || "MECHANICAL_LOG_INTERNAL"}
               </div>
@@ -668,7 +666,7 @@ const BoltTurnGame: React.FC = () => {
               </div>
             </div>
 
-            <div className="system-info-box container-glass">
+            <div className="system-info-box boltturn-glass">
               <div className="log-header">MECHANICAL_REPAIR_KIT_V2.0</div>
               <div className="info-content-static">
                 <div className="info-line">

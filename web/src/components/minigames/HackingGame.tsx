@@ -73,6 +73,8 @@ const HackingGame: React.FC = () => {
     Math.random().toString(36).substring(7).toUpperCase(),
   );
 
+  const hasEndedRef = useRef(false);
+
   // Sound refs using local assets - relative path for production build
   const hoverSound = useRef<HTMLAudioElement | null>(null);
   const clickSound = useRef<HTMLAudioElement | null>(null);
@@ -82,7 +84,7 @@ const HackingGame: React.FC = () => {
 
   useEffect(() => {
     hoverSound.current = new Audio("assets/hover.ogg");
-    clickSound.current = new Audio("assets/hover.ogg");
+    clickSound.current = new Audio("assets/success.ogg");
     errorSound.current = new Audio("assets/error.ogg");
     winSound.current = new Audio("assets/success.ogg");
     loseSound.current = new Audio("assets/failed.ogg");
@@ -155,26 +157,16 @@ const HackingGame: React.FC = () => {
   };
 
   const handleEnd = (success: boolean) => {
+    if (hasEndedRef.current) return;
+    hasEndedRef.current = true;
     setStatus(success ? "won" : "lost");
-    fetchNui("hackingEnd", { outcome: success, sessionId });
+    fetchNui("minigameEnd", { outcome: success, sessionId });
     if (success) {
-      // Play success sound
-      const aud = new Audio("assets/success.ogg");
-      aud.play().catch(() => {});
+      winSound.current?.play().catch(() => {});
       setTimeout(closeGame, 2000);
     } else {
-      // Play fail sound
-      const aud = new Audio("assets/failed.ogg");
-      aud.play().catch(() => {});
-      setTimeout(() => {
-        window.location.reload(); // Reload or close? User said remove button. Reload seems appropriate for retry, or closeGame if they should fail out. Usually fail out.
-        // Actually, if failed, they might need to restart somewhat?
-        // User said "remove button when minigame ends and show access denied text in center of console".
-        // I'll leave it showing then close or let them reload? "far uscire la scritta... e non a destra fuori"
-        // I'll show the text, then close after a delay maybe? Or just leave it?
-        // Usually minigames close on fail. I'll setup a timeout to closeGame after showing result.
-        setTimeout(closeGame, 3000);
-      }, 3000);
+      loseSound.current?.play().catch(() => {});
+      setTimeout(closeGame, 3000);
     }
   };
 

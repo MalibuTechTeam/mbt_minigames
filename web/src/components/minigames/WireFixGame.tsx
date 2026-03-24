@@ -65,6 +65,8 @@ const WireFixGame: React.FC = () => {
   const [startRow, setStartRow] = useState(0);
   const [endRow, setEndRow] = useState(0);
 
+  const hasEndedRef = useRef(false);
+
   const successSound = useRef<HTMLAudioElement | null>(null);
   const failedSound = useRef<HTMLAudioElement | null>(null);
   const turnSound = useRef<HTMLAudioElement | null>(null);
@@ -219,19 +221,21 @@ const WireFixGame: React.FC = () => {
   }, [status]);
 
   const handleEnd = (win: boolean) => {
-    if (status !== "playing") return;
+    if (hasEndedRef.current) return;
+    hasEndedRef.current = true;
     setStatus(win ? "won" : "lost");
     if (win) {
       successSound.current?.play().catch(() => {});
     } else {
       failedSound.current?.play().catch(() => {});
     }
-    fetchNui("hackingEnd", { outcome: win, sessionId });
+    fetchNui("minigameEnd", { outcome: win, sessionId });
     setTimeout(closeGame, 2500);
   };
 
   // Perform Power Pathfinding
   const updatePowerState = useCallback(() => {
+    let reachedEndSignal = false;
     setGrid((prevGrid) => {
       // Deep copy grid to reset power
       let nextGrid = prevGrid.map((row) =>
@@ -294,13 +298,16 @@ const WireFixGame: React.FC = () => {
         }
       }
 
-      if (reachedEnd && status === "playing") {
-        handleEnd(true);
+      if (reachedEnd) {
+        reachedEndSignal = true;
       }
 
       return nextGrid;
     });
-  }, [cols, rows, startRow, endRow, status]);
+    if (reachedEndSignal) {
+      handleEnd(true);
+    }
+  }, [cols, rows, startRow, endRow, handleEnd]);
 
   // Run pathfinding on initial mount and when grid changes manually (via rotation)
   useEffect(() => {

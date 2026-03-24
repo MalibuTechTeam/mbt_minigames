@@ -18,9 +18,7 @@ const CodeMatchGame: React.FC = () => {
     useMinigameStore();
   const codeLocale = locale?.code_match || {};
 
-  const initialTimeLimit = useRef(
-    gameParams.timeLimit || timeLimit || 30,
-  ).current;
+  const initialTimeLimit = useRef(timeLimit || 30).current;
   const [timeLeft, setTimeLeft] = useState(initialTimeLimit);
 
   const [stream, setStream] = useState<StreamItem[]>([]);
@@ -38,6 +36,8 @@ const CodeMatchGame: React.FC = () => {
   const didInit = useRef(false);
   const globalIdCounter = useRef(0);
   const missedRef = useRef<Record<number, boolean>>({});
+  const mistakesRef = useRef(0);
+  const hasEndedRef = useRef(false);
   const currentTargetIndexRef = useRef(0);
 
   // Difficulty parameters
@@ -175,7 +175,25 @@ const CodeMatchGame: React.FC = () => {
     };
   }, [status, SPEED_VH_PER_SEC, START_OFFSET_VH]);
 
+  const handleEnd = useCallback(
+    (win: boolean) => {
+      if (hasEndedRef.current) return;
+      hasEndedRef.current = true;
+      setStatus(win ? "won" : "lost");
+      if (win) {
+        winSound.current?.play().catch(() => {});
+      } else {
+        loseSound.current?.play().catch(() => {});
+      }
+
+      fetchNui("minigameEnd", { outcome: win, sessionId });
+      setTimeout(closeGame, 2500);
+    },
+    [sessionId, closeGame],
+  );
+
   useEffect(() => {
+    if (status !== "playing") return;
     const timer = setInterval(() => {
       setTimeLeft((prev: number) => {
         if (prev <= 1) {
@@ -186,22 +204,7 @@ const CodeMatchGame: React.FC = () => {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  const handleEnd = useCallback(
-    (win: boolean) => {
-      setStatus(win ? "won" : "lost");
-      if (win) {
-        winSound.current?.play().catch(() => {});
-      } else {
-        loseSound.current?.play().catch(() => {});
-      }
-
-      fetchNui("hackingEnd", { outcome: win, sessionId });
-      setTimeout(closeGame, 2500);
-    },
-    [sessionId, closeGame],
-  );
+  }, [status, handleEnd]);
 
   const triggerMistake = useCallback(() => {
     setIsError(true);
@@ -210,22 +213,21 @@ const CodeMatchGame: React.FC = () => {
       errorSound.current.play().catch(() => {});
     }
 
-    setMistakes((prev) => {
-      const newMistakes = prev + 1;
-      if (newMistakes >= maxMistakes) {
-        handleEnd(false);
-      } else {
-        setTimeLeft((t: number) => Math.max(0, t - 2));
-        setTimeout(() => setIsError(false), 500);
-        // Automatically skip to next target if this was a miss
-        setCurrentTargetIndex((idx) => {
-          const nextIdx = idx + 1;
-          currentTargetIndexRef.current = nextIdx;
-          return nextIdx;
-        });
-      }
-      return newMistakes;
-    });
+    mistakesRef.current += 1;
+    const newMistakes = mistakesRef.current;
+    setMistakes(newMistakes);
+
+    if (newMistakes >= maxMistakes) {
+      handleEnd(false);
+    } else {
+      setTimeLeft((t: number) => Math.max(0, t - 2));
+      setTimeout(() => setIsError(false), 500);
+      setCurrentTargetIndex((idx) => {
+        const nextIdx = idx + 1;
+        currentTargetIndexRef.current = nextIdx;
+        return nextIdx;
+      });
+    }
   }, [maxMistakes, handleEnd]);
 
   const handleAction = useCallback(() => {

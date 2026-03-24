@@ -13,7 +13,8 @@ local function startHackingSession(data)
     local pedCoords = GetEntityCoords(ped)
     local pedRotation = GetEntityRotation(ped)
 
-    local animConfig = MBT.Animations['hacking'] or {}
+    local gameConfig = MBT.Minigames['hacking'] or {}
+    local animConfig = gameConfig.animation or {}
     local animDict = animConfig.Dict or "anim@heists@ornate_bank@hack"
     local laptopModel = animConfig.Prop or "hei_prop_hst_laptop"
     local bagModel = animConfig.Bag or "hei_p_m_bag_var22_arm_s"
@@ -41,8 +42,10 @@ local function startHackingSession(data)
         pedRotation.z, 2, false, false, 1065353216, 0, 1.3)
     NetworkAddPedToSynchronisedScene(ped, netScene, animDict, "hack_enter", 1.5, -4.0, 1, 16, 1148846080, 0)
     local bag = CreateObject(GetHashKey(bagModel), pedCoords.x, pedCoords.y, pedCoords.z, 1, 1, 0)
+    SetModelAsNoLongerNeeded(GetHashKey(bagModel))
     NetworkAddEntityToSynchronisedScene(bag, netScene, animDict, "hack_enter_bag", 4.0, -8.0, 1)
     local laptop = CreateObject(GetHashKey(laptopModel), pedCoords.x, pedCoords.y, pedCoords.z, 1, 1, 0)
+    SetModelAsNoLongerNeeded(GetHashKey(laptopModel))
     NetworkAddEntityToSynchronisedScene(laptop, netScene, animDict, "hack_enter_laptop", 4.0, -8.0, 1)
 
     local netScene2 = NetworkCreateSynchronisedScene(animPos2.x, animPos2.y, animPos2.z, pedRotation.x, pedRotation.y,
@@ -66,7 +69,9 @@ local function startHackingSession(data)
     -- Difficulty & Parameter Resolution
     local diffRaw = data.difficulty or data.Difficulty or MBT.DefaultDifficulty or "Easy"
     local diff = string.upper(string.sub(diffRaw, 1, 1)) .. string.lower(string.sub(diffRaw, 2))
-    local configParams = (MBT.Difficulties and MBT.Difficulties[diff] and MBT.Difficulties[diff]['hacking']) or {}
+    local gameConfig = MBT.Minigames['hacking'] or {}
+    local diffConfigs = gameConfig.difficulties or {}
+    local configParams = diffConfigs[diff] or {}
     local timeLimit = data.Time or data.time or configParams.time or 30
 
     local finalParams = {}
@@ -84,15 +89,31 @@ local function startHackingSession(data)
             Type = "hacking",
             TimeLimit = timeLimit,
             Params = finalParams,
-            Locale = MBT.Locale,
+            Locale = gameConfig,
             Debug = MBT.Debug
         }
     })
 
     SetNuiFocus(true, true)
 
-    while sState.Response == nil do
+    local hackWaitStart = GetGameTimer()
+    while sState.Response == nil and (GetGameTimer() - hackWaitStart) < 120000 do
         Citizen.Wait(5)
+    end
+
+    if sState.Response == nil then
+        Utils.MbtDebugger("^1Hacking session timed out! Forcing cleanup.^7")
+        SetNuiFocus(false, false)
+        SendNUIMessage({ Action = "handleUI", Status = false, Payload = {} })
+        NetworkStopSynchronisedScene(netScene)
+        NetworkStopSynchronisedScene(netScene2)
+        NetworkStopSynchronisedScene(netScene3)
+        DeleteObject(laptop)
+        DeleteObject(bag)
+        SetFollowPedCamViewMode(0)
+        FreezeEntityPosition(ped, false)
+        Sessions.Cleanup(sessionId)
+        return false
     end
 
     local outcome = sState.Response
@@ -116,12 +137,12 @@ local function startRepairSession(data)
     -- Safety wait to ensure previous UI/Animations (like ox_lib progressbar)
     Citizen.Wait(100)
 
-    local type = data.type or "hacking"
-    if type == "hacking" then
+    local gameType = data.type or data.Type or "hacking"
+    if gameType == "hacking" then
         return startHackingSession(data)
     end
 
-    local sessionId = Sessions.Start(type, Utils)
+    local sessionId = Sessions.Start(gameType, Utils)
     local sState = Sessions.Get(sessionId)
 
     local ped = PlayerPedId()
@@ -130,11 +151,13 @@ local function startRepairSession(data)
     -- Difficulty & Parameter Resolution
     local diffRaw = data.difficulty or data.Difficulty or MBT.DefaultDifficulty or "Easy"
     local diff = string.upper(string.sub(diffRaw, 1, 1)) .. string.lower(string.sub(diffRaw, 2))
-    local configParams = (MBT.Difficulties and MBT.Difficulties[diff] and MBT.Difficulties[diff][type]) or {}
+    local gameConfig = MBT.Minigames[gameType] or {}
+    local diffConfigs = gameConfig.difficulties or {}
+    local configParams = diffConfigs[diff] or {}
     local time = data.time or data.Time or configParams.time or 30
 
     -- Animation Resolve
-    local baseAnimConfig = MBT.Animations[type] or {}
+    local baseAnimConfig = gameConfig.animation or {}
     local callerAnimOverrides = data.animation or {}
     local finalAnimData = {
         Type = (callerAnimOverrides.Type or baseAnimConfig.Type) == "Scene" and "Sequence" or
@@ -181,6 +204,7 @@ local function startRepairSession(data)
             Utils.LoadModel(finalAnimData.Prop)
             propObj = CreateObject(GetHashKey(finalAnimData.Prop), pedCoords.x, pedCoords.y, pedCoords.z, true,
                 true, true)
+            SetModelAsNoLongerNeeded(GetHashKey(finalAnimData.Prop))
             SetEntityAsMissionEntity(propObj, true, true)
             AttachEntityToEntity(propObj, ped, GetPedBoneIndex(ped, finalAnimData.Bone), finalAnimData.Offset.x,
                 finalAnimData.Offset.y, finalAnimData.Offset.z, finalAnimData.Rot.x, finalAnimData.Rot.y,
@@ -197,26 +221,42 @@ local function startRepairSession(data)
     local extraParams = data.params or data.Params or {}
     for k, v in pairs(extraParams) do finalParams[k] = v end
 
-    Utils.MbtDebugger("Starting Repair Session | Type: " .. type .. " | Diff: " .. diff .. " | Time: " .. time)
+    Utils.MbtDebugger("Starting Repair Session | Type: " .. gameType .. " | Diff: " .. diff .. " | Time: " .. time)
 
     SendNUIMessage({
         Action = "handleUI",
         Status = true,
         Payload = {
             Id = sessionId,
-            Type = type,
+            Type = gameType,
             TimeLimit = time,
             Params = finalParams,
-            Locale = MBT.Locale,
+            Locale = gameConfig,
             Debug = MBT.Debug
         }
     })
 
     SetNuiFocus(true, true)
 
-    while sState.Response == nil do
+    local repairWaitStart = GetGameTimer()
+    while sState.Response == nil and (GetGameTimer() - repairWaitStart) < 120000 do
         Animations.UpdatePtfxPulse(sceneFx)
         Citizen.Wait(100)
+    end
+
+    if sState.Response == nil then
+        Utils.MbtDebugger("^1Repair session timed out! Forcing cleanup.^7")
+        if finalAnimData.Type == "Sequence" then
+            Animations.StopSequence(finalAnimData, ped, sceneProps, sceneFx, Utils)
+        else
+            ClearPedTasks(ped)
+            if propObj then DeleteObject(propObj) end
+        end
+        FreezeEntityPosition(ped, false)
+        SetNuiFocus(false, false)
+        Sessions.Cleanup(sessionId)
+        SendNUIMessage({ Action = "handleUI", Status = false, Payload = {} })
+        return false
     end
 
     local outcome = sState.Response
@@ -238,7 +278,7 @@ local function startRepairSession(data)
     return outcome
 end
 
-RegisterNUICallback("hackingEnd", function(data, cb)
+RegisterNUICallback("minigameEnd", function(data, cb)
     SetNuiFocus(false, false)
     Sessions.SetResponse(data.sessionId, data.outcome)
     Wait(2000)
