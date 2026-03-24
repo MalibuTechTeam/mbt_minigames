@@ -13,63 +13,41 @@ jobs:
 
     steps:
       - name: Install archive tools
-        run: sudo apt-get install -y zip
+        run: sudo apt install zip
 
       - name: Checkout source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v2.2.2
         with:
-          version: 9.7.0
+          version: 8.1.1
 
-      - name: Install & Build Web UI
-        working-directory: ./web
-        run: |
-          pnpm install
-          pnpm build
-
-      - name: Get variables & Tag Message
+      - name: Get variables
         id: get_vars
         run: |
-          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-          echo "DATE=$(date +'%d-%m-%Y')" >> $GITHUB_ENV
-
-          # Extract annotated tag message for changelog
-          TAG_MSG=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
-
-          # Fallback to commit message if no annotated tag
-          if [ -z "$TAG_MSG" ]; then
-            TAG_MSG="${{ github.event.head_commit.message }}"
-          fi
-
-          # Multiline output handling
-          {
-            echo 'CHANGELOG<<EOF'
-            echo "$TAG_MSG"
-            echo 'EOF'
-          } >> $GITHUB_ENV
+          echo '::set-output name=SHORT_SHA::$(git rev-parse --short HEAD)'
+          echo '::set-output name=DATE::$(date +'%D')'
 
       - name: Bump manifest version
         run: node .github/actions/bump-manifest-version.js
         env:
           TGT_RELEASE_VERSION: ${{ github.ref_name }}
-
+      
       - name: Push manifest change
-        uses: EndBug/add-and-commit@v9
+        uses: EndBug/add-and-commit@v8
         with:
           add: fxmanifest.lua
           push: true
           author_name: Manifest Bumper
           author_email: 41898282+github-actions[bot]@users.noreply.github.com
           message: "chore: bump manifest version to ${{ github.ref_name }}"
+
+      - name: Check github.ref_name   
+        run: echo ${{ github.ref_name }}
 
       - name: Update tag ref
         uses: EndBug/latest-tag@latest
@@ -79,24 +57,38 @@ jobs:
       - name: Bundle files
         run: |
           mkdir -p ./temp/mbt_minigames
-          # Copy config and manifest
-          cp ./{README.md,config.lua,fxmanifest.lua} ./temp/mbt_minigames/ 2>/dev/null || true
-
-          # Copy core and modules
-          cp -r ./{core,modules} ./temp/mbt_minigames/ 2>/dev/null || true
-
-          # Copy only compiled web build (dist)
-          mkdir -p ./temp/mbt_minigames/web
-          cp -r ./web/dist ./temp/mbt_minigames/web/
-
-          # Zip
+          cp ./{README.md,fxmanifest.lua} ./temp/mbt_minigames
+          cp -r ./{core,web} ./temp/mbt_minigames
           cd ./temp && zip -r ../mbt_minigames.zip ./mbt_minigames
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Create Release
+        uses: "marvinpinto/action-automatic-releases@v1.2.1"
+        id: auto_release
         with:
-          files: mbt_minigames.zip
-          name: ${{ github.ref_name }}
-          body: ${{ env.CHANGELOG }}
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          title: "${{ env.RELEASE_VERSION }}"
           prerelease: false
+          files: mbt_minigames.zip
 
+        env:
+          CI: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Get current date
+        if: inputs.releaseVersion == ''
+        id: date
+        uses: Kaven-Universe/github-action-current-date-time@v1
+        with:
+          format: "DD-MM-YYYY"
+
+      - name: Post announcement on Discord
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DISCORD_USERNAME: "MaliBot"
+          DISCORD_AVATAR:  "https://i.imgur.com/FYYQGIF.png"
+          DISCORD_EMBEDS : '[{"title": "MBT Minigames[${{ github.ref_name }} - ${{ inputs.releaseVersion || steps.date.outputs.time }}]", "description": "**Changelog:**\n\n- ${{github.event.head_commit.message}}", "color": 13975696,"footer": {"text": "© Malibú Tech", "icon_url": "https://i.imgur.com/CebOcN3.png"},"image": {"url": "https://media.discordapp.net/attachments/1036244419881476106/1142083705192599552/Thumbnail_Youtube_MBT_Minigames.png"}}]'
+        uses: Ilshidur/action-discord@0.3.2
+        with: 
+          args: |
+            <@&897197423502450772>

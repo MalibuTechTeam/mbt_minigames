@@ -239,14 +239,11 @@ local function startRepairSession(data)
 end
 
 RegisterNUICallback("hackingEnd", function(data, cb)
-    local _source = source
     SetNuiFocus(false, false)
     Sessions.SetResponse(data.sessionId, data.outcome)
-    cb("ok")
-
-    -- Allow some time for animations/sounds to finish before hiding UI overlay
     Wait(2000)
     SendNUIMessage({ Action = "handleUI", Status = false, Payload = {} })
+    cb("ok")
 end)
 
 exports('startHackingSession', function(data)
@@ -265,3 +262,8 @@ if Debug then
         startRepairSession = startRepairSession
     })
 end
+
+return {
+    startHackingSession = startHackingSession,
+    startRepairSession = startRepairSession
+}
