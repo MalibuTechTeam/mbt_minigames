@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://r2.fivemanage.com/dPa5OqQoEubnwFkRaIgUq/Thumbanail/mbt_minigames_github.png" width="100%"/>
+<img src=".github/mbt_minigames_github.png" width="100%"/>
 
 <h1>mbt_minigames</h1>
 
