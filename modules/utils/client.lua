@@ -21,8 +21,12 @@ function Utils.GenerateSessionId()
 end
 
 ---@param animdict string
+---@return boolean
 function Utils.LoadAnimDict(animdict)
-    if not DoesAnimDictExist(animdict) then return end
+    if not DoesAnimDictExist(animdict) then
+        Utils.MbtDebugger("^1Animation dictionary does not exist: " .. tostring(animdict) .. "^7")
+        return false
+    end
 
     local timeout = false
     SetTimeout(3000, function() timeout = true end)
@@ -32,11 +36,14 @@ function Utils.LoadAnimDict(animdict)
         Citizen.Wait(10)
     end
     if timeout then
-        Utils.MbtDebugger("Failed to load animation dictionary: " .. tostring(animdict))
+        Utils.MbtDebugger("^1Failed to load animation dictionary: " .. tostring(animdict) .. "^7")
+        return false
     end
+    return true
 end
 
 ---@param model string
+---@return boolean
 function Utils.LoadModel(model)
     local timeout = false
     SetTimeout(5000, function() timeout = true end)
@@ -46,6 +53,12 @@ function Utils.LoadModel(model)
         RequestModel(hashModel)
         Wait(50)
     until HasModelLoaded(hashModel) or timeout
+
+    if timeout then
+        Utils.MbtDebugger("^1Failed to load model: " .. tostring(model) .. "^7")
+        return false
+    end
+    return true
 end
 
 return Utils

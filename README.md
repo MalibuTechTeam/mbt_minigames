@@ -1,103 +1,194 @@
-<div id="header" align="center">
-  <img src="https://r2.fivemanage.com/dPa5OqQoEubnwFkRaIgUq/Thumbanail/mbt_minigames.png?ex=66193356&is=6606be56&hm=69db0bfb88fbeae3846efd710f4997eaccf1a2e69fa04832eb343412bdf289a9&=&format=webp&quality=lossless&width=1290&height=726" width="600"/>
-  
-  <h1>MBT Minigames</h1>
-  
-  <p>
-    <img src="https://img.shields.io/badge/Platform-FiveM-orange.svg" alt="FiveM"/>
-    <img src="https://img.shields.io/badge/Build-Vite-blue.svg" alt="Vite"/>
-    <img src="https://img.shields.io/badge/Framework-React-blue.svg" alt="React"/>
-    <img src="https://img.shields.io/badge/License-Protected-red.svg" alt="Protected"/>
-  </p>
+<div align="center">
+
+<!-- Replace with the generated promotional banner -->
+ <img src="https://r2.fivemanage.com/dPa5OqQoEubnwFkRaIgUq/Thumbanail/mbt_minigames_github.png" width="100%"/> 
+
+<h1>mbt_minigames</h1>
+
+<p>A collection of four unique, skill-based minigames for FiveM</p>
+
+<p>
+  <img src="https://img.shields.io/badge/version-2.0.0-00f2ff?style=flat-square"/>
+  <img src="https://img.shields.io/badge/FiveM-GTA%20V-orange?style=flat-square"/>
+  <img src="https://img.shields.io/badge/Lua-5.4-blueviolet?style=flat-square"/>
+  <img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square"/>
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square"/>
+</p>
+
 </div>
 
 ---
 
-## 🎮 Immersive Cybernetic Minigame Suite
+## ⚠️ Version Compatibility
 
-**# MBT Minigames 👾🎮
+> This resource is a **required dependency** for all Malibù Tech scripts.
+> Make sure you are using the correct version for your other MBT resources.
 
-> [!IMPORTANT]
-> **Core Dependency**: This resource is a mandatory dependency for all Malibú Tech scripts. It serves as the central hub and primary library for all current and future minigames across our entire resource ecosystem.
+| MBT Resource | Required version |
+|---|---|
+| **mbt_elevator v3** (and later) | `mbt_minigames v2.x` ← this version |
+| **mbt_elevator v2** (and earlier) | `mbt_minigames v1.x` |
 
-A premium collection of high-quality minigames for FiveM, featuring immersive UI, smooth animations, and a unified laptop interface. Perfect for hacking, robbery, or maintenance tasks in your server scripts.
- Every game is built with a focus on **visual excellence**, **smooth performance**, and **maximum immersion**.
-
-### 🌟 Featured Minigames
-
-| 💻 [Hacking](#-hacking) | 🔌 [Wire Fix](#-wire-fix) | 🔧 [Bolt Turn](#-bolt-turn) | 📟 [Code Match](#-code-match) |
-| :---: | :---: | :---: | :---: |
-| Pattern decryption with CRT glitch effects. | Physics-based circuit repair. | High-pressure heat maintenance. | Rapid neural link data matching. |
+Mixing incompatible versions will cause minigames to not trigger correctly.
 
 ---
 
-## ✨ Core Features
+## Overview
 
-> [!TIP]
-> **Laptop Interface**: All games automatically launch within a premium, animated laptop SVG frame for unparalleled roleplay immersion.
+`mbt_minigames` replaces repetitive progress bars with four distinct, skill-based interactions. Each game runs inside a cyberpunk terminal UI, plays a custom character animation with props, and returns a simple `true`/`false` outcome to the calling resource via exports.
 
-- 📺 **Advanced Visuals**: Authentic CRT scanlines, digital glitch effects, and smooth 3D entry animations.
-- 🎯 **Dynamic Difficulty**: Three pre-calibrated tiers (Easy, Medium, Hard) that scale perfectly with your server's needs.
-- 🔊 **Soundscape**: High-fidelity audio feedback for every interaction, success, and failure.
-- 🌐 **Full Internationalization**: Complete translation support via `config.lua` for global community reach.
+**YouTube showcase:** [Watch Here](https://www.youtube.com/watch?v=TSCrxiJaWdg)
 
 ---
 
-## 🚀 Quick Start
+## Minigames
 
-### 1. Installation
-1. Download the latest release from our repository.
-2. Drag and drop the `mbt_minigames` folder into your `resources` directory.
-3. Add `ensure mbt_minigames` to your `server.cfg`.
-
-### 2. Basic Configuration
-Open `config.lua` to customize:
-- `Difficulty`: Set the base difficulty parameters.
-- `Locale`: Translate headers, buttons, and status messages.
-- `Debugger`: Enable for technical insights during development.
+| Game | Type | Description |
+|---|---|---|
+| 💻 **Hacking** | Sequence matching | Identify and click hex codes in the correct order before time runs out. Includes a terminal boot sequence and synchronised laptop + bag props. |
+| ⚡ **Wire Fix** | Pipe puzzle | Rotate tiles on a grid to connect the power source to the endpoint. Grid size and complexity scale with difficulty. Welding animation with torch and mask props + electrical particles. |
+| 🔩 **Bolt Turn** | Tension mechanic | Hold a key to build torque on each bolt and release it inside a moving sweet spot. Overheat causes mistakes. Drilling animation with drill prop. |
+| 📟 **Code Match** | Timing / rhythm | A stream of codes scrolls down the screen — press Space when the target code aligns with the scanner bracket. Tablet animation. |
 
 ---
 
-## 💻 Developer Integration Guide
+## Installation
 
-Integrating **MBT Minigames** into your scripts is seamless via exports.
+1. Download the latest release and drop the `mbt_minigames` folder into your `resources` directory
+2. Add `ensure mbt_minigames` to your `server.cfg` **before** any resource that depends on it
+3. Restart the server
 
-### Basic Export Usage
-All exports return a boolean `true` for success and `false` for failure.
+> If you modify the web UI source, rebuild it with:
+> ```bash
+> cd web && pnpm install && pnpm build
+> ```
+
+---
+
+## Usage
+
+All games are started via exports. Both return `true` (won) or `false` (lost / timed out).
+
+### Hacking
 
 ```lua
--- Simple integration example
-local success = exports.mbt_minigames:startHackingSession({
-    Difficulty = "Medium" -- Optional: "Easy", "Medium", "Hard"
+local outcome = exports['mbt_minigames']:startHackingSession({
+    difficulty = "Medium",  -- "Easy" | "Medium" | "Hard"  (optional)
+    time       = 40,        -- override time limit in seconds (optional)
+    params     = {},        -- override specific difficulty params (optional)
+    onSuccess  = function() print("Access granted!") end,
+    onFail     = function() print("Access denied.") end,
 })
-
-if success then
-    -- Your success logic here
-    print("System Compromised!")
-else
-    -- Your failure logic here
-    print("Connection Terminated.")
-end
 ```
 
-### Supported Exports Reference
+### Wire Fix, Bolt Turn, Code Match
 
-| Export | Use Case | Parameters |
-| :--- | :--- | :--- |
-| `startHackingSession` | Node-based pattern hacking. | `(params)` |
-| `startWireFixSession` | Drag-and-drop electrical repair. | `(params)` |
-| `startBoltTurnSession` | Precision clicking and heat control. | `(params)` |
-| `startCodeMatchSession` | High-speed data sequence matching. | `(params)` |
+```lua
+local outcome = exports['mbt_minigames']:startRepairSession({
+    type       = "wire_fix",  -- "wire_fix" | "bolt_turn" | "code_match"
+    difficulty = "Hard",
+    time       = 60,
+    params     = { wireCount = 6 },
+    onSuccess  = function() print("Repair complete!") end,
+    onFail     = function() print("Repair failed.") end,
+})
+```
+
+### Animation override
+
+Any session accepts a custom `animation` table to replace the default animation:
+
+```lua
+exports['mbt_minigames']:startRepairSession({
+    type = "bolt_turn",
+    animation = {
+        Type           = "Sequence",
+        Dict           = "anim@heists@fleeca_bank@drilling",
+        Enter          = "drill_straight_start",
+        Loop           = "drill_straight_idle",
+        EnterTime      = 1200,
+        EnterPropDelay = 0,
+        Props = {
+            {
+                Model  = "hei_prop_heist_drill",
+                Bone   = 28422,
+                Offset = vector3(0.0, 0.0, 0.0),
+                Rot    = vector3(180.0, 0.0, 180.0),
+            }
+        }
+    }
+})
+```
 
 ---
 
-## 🎥 Media Showcase
-Check out our high-definition showcase to see the effects in action:
-- **YouTube Showcase**: [Watch Here](https://www.youtube.com/watch?v=TSCrxiJaWdg)
----
-## ⚖️ Rights & Protection
-![image](https://images.dmca.com/Badges/dmca_protected_sml_120m.png?ID=91018a5c-ecd2-440d-8a32-d94b2cecca80)
-This digital asset is protected by **Malibu Tech**. 
-Unauthorized redistribution, reselling, or modification of the core visual assets is strictly prohibited and protected by DMCA.
+## Configuration
 
-##### Copyright © 2026 [Malibú Tech](). All rights reserved.
+Everything is controlled from `config.lua`. Each game entry has three sections:
+
+```lua
+MBT.Debug            = false   -- enable debug commands & logging
+MBT.DefaultDifficulty = "Easy"
+
+MBT.Minigames = {
+    ['hacking'] = {
+        locale = {
+            label       = "Hacking",
+            title       = "TERMINAL NODE DECRYPTION",
+            -- ... all UI strings
+        },
+        animation = {
+            Dict    = "anim@heists@ornate_bank@hack",
+            Prop    = "hei_prop_hst_laptop",
+            Bag     = "hei_p_m_bag_var22_arm_s",
+            OffsetZ = 0.9,
+        },
+        difficulties = {
+            Easy   = { time = 60, sequenceLength = 4, maxMistakes = 4 },
+            Medium = { time = 35, sequenceLength = 6, maxMistakes = 3 },
+            Hard   = { time = 20, sequenceLength = 8, maxMistakes = 2 },
+        }
+    },
+    -- wire_fix, bolt_turn, code_match follow the same structure
+}
+```
+
+### Difficulty parameters reference
+
+| Game | Parameters |
+|---|---|
+| `hacking` | `time`, `sequenceLength`, `maxMistakes` |
+| `wire_fix` | `time`, `wireCount`, `shuffleSpeed`, `maxMistakes` |
+| `bolt_turn` | `time`, `boltCount`, `heatSpeed`, `maxMistakes` |
+| `code_match` | `time`, `segmentCount`, `shiftSpeed`, `maxMistakes` |
+
+---
+
+## Debug Commands
+
+Enable with `MBT.Debug = true` in `config.lua`:
+
+| Command | Description |
+|---|---|
+| `/testminigame [type] [difficulty]` | Opens any minigame directly in-game |
+| `/testscene [type]` | Plays the animation sequence only, without opening the UI |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Game scripts | Lua 5.4 |
+| UI framework | React 19 + TypeScript |
+| Animations | Framer Motion |
+| State management | Zustand |
+| Build tool | Vite + pnpm |
+
+---
+
+## License
+
+MIT — free to use and modify. Attribution appreciated.
+
+##### Copyright © 2026 [Malibù Tech](https://github.com/MalibuTechTeam). All rights reserved.

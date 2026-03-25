@@ -3,10 +3,28 @@ local Sessions = loadModule('modules.sessions.client')
 local Animations = loadModule('modules.animations.client')
 local Debug = loadModule('modules.debug.client')
 
+-- Track active scene objects for emergency cleanup on resource stop
+local activeSceneProps = {}
+local activeSceneFx = {}
+
+AddEventHandler('onResourceStop', function(resourceName)
+    if GetCurrentResourceName() ~= resourceName then return end
+    for _, pObj in ipairs(activeSceneProps) do
+        if DoesEntityExist(pObj) then DeleteObject(pObj) end
+    end
+    for _, fx in ipairs(activeSceneFx) do
+        StopParticleFxLooped(fx.handle, false)
+    end
+    activeSceneProps = {}
+    activeSceneFx = {}
+    FreezeEntityPosition(PlayerPedId(), false)
+    SetNuiFocus(false, false)
+end)
+
 ---@param data table
 ---@return boolean
 local function startHackingSession(data)
-    local sessionId = Sessions.Start("hacking", Utils)
+    local sessionId = Sessions.Start()
     local sState = Sessions.Get(sessionId)
 
     local ped = PlayerPedId()
@@ -43,9 +61,11 @@ local function startHackingSession(data)
     NetworkAddPedToSynchronisedScene(ped, netScene, animDict, "hack_enter", 1.5, -4.0, 1, 16, 1148846080, 0)
     local bag = CreateObject(GetHashKey(bagModel), pedCoords.x, pedCoords.y, pedCoords.z, 1, 1, 0)
     SetModelAsNoLongerNeeded(GetHashKey(bagModel))
+    table.insert(activeSceneProps, bag)
     NetworkAddEntityToSynchronisedScene(bag, netScene, animDict, "hack_enter_bag", 4.0, -8.0, 1)
     local laptop = CreateObject(GetHashKey(laptopModel), pedCoords.x, pedCoords.y, pedCoords.z, 1, 1, 0)
     SetModelAsNoLongerNeeded(GetHashKey(laptopModel))
+    table.insert(activeSceneProps, laptop)
     NetworkAddEntityToSynchronisedScene(laptop, netScene, animDict, "hack_enter_laptop", 4.0, -8.0, 1)
 
     local netScene2 = NetworkCreateSynchronisedScene(animPos2.x, animPos2.y, animPos2.z, pedRotation.x, pedRotation.y,
@@ -70,8 +90,7 @@ local function startHackingSession(data)
     local diffRaw = data.difficulty or data.Difficulty or MBT.DefaultDifficulty or "Easy"
     local diff = string.upper(string.sub(diffRaw, 1, 1)) .. string.lower(string.sub(diffRaw, 2))
     local gameConfig = MBT.Minigames['hacking'] or {}
-    local diffConfigs = gameConfig.difficulties or {}
-    local configParams = diffConfigs[diff] or {}
+    local configParams = (gameConfig.difficulties or {})[diff] or {}
     local timeLimit = data.Time or data.time or configParams.time or 30
 
     local finalParams = {}
@@ -89,7 +108,7 @@ local function startHackingSession(data)
             Type = "hacking",
             TimeLimit = timeLimit,
             Params = finalParams,
-            Locale = gameConfig,
+            Locale = gameConfig.locale,
             Debug = MBT.Debug
         }
     })
@@ -110,6 +129,7 @@ local function startHackingSession(data)
         NetworkStopSynchronisedScene(netScene3)
         DeleteObject(laptop)
         DeleteObject(bag)
+        activeSceneProps = {}
         SetFollowPedCamViewMode(0)
         FreezeEntityPosition(ped, false)
         Sessions.Cleanup(sessionId)
@@ -122,6 +142,7 @@ local function startHackingSession(data)
     Citizen.Wait(6000)
     DeleteObject(laptop)
     DeleteObject(bag)
+    activeSceneProps = {}
     NetworkStopSynchronisedScene(netScene3)
 
     SetFollowPedCamViewMode(0)
@@ -142,7 +163,7 @@ local function startRepairSession(data)
         return startHackingSession(data)
     end
 
-    local sessionId = Sessions.Start(gameType, Utils)
+    local sessionId = Sessions.Start()
     local sState = Sessions.Get(sessionId)
 
     local ped = PlayerPedId()
@@ -152,8 +173,7 @@ local function startRepairSession(data)
     local diffRaw = data.difficulty or data.Difficulty or MBT.DefaultDifficulty or "Easy"
     local diff = string.upper(string.sub(diffRaw, 1, 1)) .. string.lower(string.sub(diffRaw, 2))
     local gameConfig = MBT.Minigames[gameType] or {}
-    local diffConfigs = gameConfig.difficulties or {}
-    local configParams = diffConfigs[diff] or {}
+    local configParams = (gameConfig.difficulties or {})[diff] or {}
     local time = data.time or data.Time or configParams.time or 30
 
     -- Animation Resolve
@@ -192,8 +212,8 @@ local function startRepairSession(data)
         PreEnterFlag = callerAnimOverrides.PreEnterFlag or baseAnimConfig.PreEnterFlag
     }
 
-    local sceneProps = {}
-    local sceneFx = {}
+    local sceneProps = activeSceneProps
+    local sceneFx = activeSceneFx
     local propObj = nil
 
     if finalAnimData.Type == "Sequence" then
@@ -231,7 +251,7 @@ local function startRepairSession(data)
             Type = gameType,
             TimeLimit = time,
             Params = finalParams,
-            Locale = gameConfig,
+            Locale = gameConfig.locale,
             Debug = MBT.Debug
         }
     })
@@ -271,6 +291,10 @@ local function startRepairSession(data)
     FreezeEntityPosition(ped, false)
     SetNuiFocus(false, false)
 
+    -- Clear module-level scene tracking after successful cleanup
+    activeSceneProps = {}
+    activeSceneFx = {}
+
     if outcome and data.onSuccess then data.onSuccess() end
     if not outcome and data.onFail then data.onFail() end
 
@@ -280,6 +304,11 @@ end
 
 RegisterNUICallback("minigameEnd", function(data, cb)
     SetNuiFocus(false, false)
+    if type(data.sessionId) ~= "string" or type(data.outcome) ~= "boolean" then
+        Utils.MbtDebugger("^1NUI minigameEnd received invalid data — sessionId or outcome malformed^7")
+        cb("invalid")
+        return
+    end
     Sessions.SetResponse(data.sessionId, data.outcome)
     Wait(2000)
     SendNUIMessage({ Action = "handleUI", Status = false, Payload = {} })

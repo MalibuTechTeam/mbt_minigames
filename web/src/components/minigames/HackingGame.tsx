@@ -21,20 +21,26 @@ const BootSequence: React.FC<{
       "[ READY ] SYSTEM OVERRIDE ACTIVE.",
     ];
 
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
     let currentLine = 0;
     const addLine = () => {
+      if (cancelled) return;
       if (currentLine < bootLines.length) {
         setLines((prev) => [...prev, bootLines[currentLine]]);
         currentLine++;
-        // Random delay between lines to simulate processing
-        setTimeout(addLine, Math.random() * 300 + 100);
+        timers.push(setTimeout(addLine, Math.random() * 300 + 100));
       } else {
-        setTimeout(onComplete, 800);
+        timers.push(setTimeout(onComplete, 800));
       }
     };
 
-    const timer = setTimeout(addLine, 100);
-    return () => clearTimeout(timer);
+    timers.push(setTimeout(addLine, 100));
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+    };
   }, [onComplete, hackingLocale]);
 
   return (
@@ -58,7 +64,7 @@ const BootSequence: React.FC<{
 const HackingGame: React.FC = () => {
   const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
     useMinigameStore();
-  const hackingLocale = locale?.hacking || {};
+  const hackingLocale = locale || {};
   const [timeLeft, setTimeLeft] = useState(timeLimit || 35);
   const [gridItems, setGridItems] = useState<string[]>([]);
   const [wantedItems, setWantedItems] = useState<string[]>([]);
@@ -88,6 +94,13 @@ const HackingGame: React.FC = () => {
     errorSound.current = new Audio("assets/error.ogg");
     winSound.current = new Audio("assets/success.ogg");
     loseSound.current = new Audio("assets/failed.ogg");
+    return () => {
+      hoverSound.current?.pause();
+      clickSound.current?.pause();
+      errorSound.current?.pause();
+      winSound.current?.pause();
+      loseSound.current?.pause();
+    };
   }, []);
 
   useEffect(() => {

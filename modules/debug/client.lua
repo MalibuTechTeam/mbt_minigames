@@ -5,11 +5,11 @@ local Debug = {}
 function Debug.Initialize(actions)
     if MBT.Debug then
         RegisterCommand("testminigame", function(source, args)
-            local type = args[1] or "code_match"
+            local gameType = args[1] or "code_match"
             local diff = args[2] or "Easy"
-            Utils.MbtDebugger("Debug Command: Testing " .. type .. " on " .. diff)
+            Utils.MbtDebugger("Debug Command: Testing " .. gameType .. " on " .. diff)
             if actions and actions.startRepairSession then
-                local outcome = actions.startRepairSession({ type = type, difficulty = diff })
+                local outcome = actions.startRepairSession({ type = gameType, difficulty = diff })
                 Utils.MbtDebugger("Debug Result: " .. tostring(outcome))
             else
                 Utils.MbtDebugger("^1ERROR: startRepairSession not provided to debug module!^7")
@@ -17,17 +17,18 @@ function Debug.Initialize(actions)
         end, false)
 
         RegisterCommand("testscene", function(source, args)
-            local type = args[1] or "bolt_turn"
-            local finalAnimData = MBT.Animations[type]
+            local gameType = args[1] or "bolt_turn"
+            local gameConfig = MBT.Minigames and MBT.Minigames[gameType]
+            local finalAnimData = gameConfig and gameConfig.animation
             if not finalAnimData then
-                Utils.MbtDebugger("No scene configuration found for type: " .. type)
+                Utils.MbtDebugger("No scene configuration found for type: " .. gameType)
                 return
             end
 
             local ped = PlayerPedId()
             SetCurrentPedWeapon(ped, GetHashKey("WEAPON_UNARMED"), true)
             local pedCoords = GetEntityCoords(ped)
-            Utils.MbtDebugger("Testing Scene: " .. type .. " | Dict: " .. tostring(finalAnimData.Dict))
+            Utils.MbtDebugger("Testing Scene: " .. gameType .. " | Dict: " .. tostring(finalAnimData.Dict))
 
             if not DoesAnimDictExist(finalAnimData.Dict) then
                 Utils.MbtDebugger("Animation Dictionary does not exist: " .. tostring(finalAnimData.Dict))
@@ -49,18 +50,17 @@ function Debug.Initialize(actions)
             FreezeEntityPosition(ped, false)
             Utils.MbtDebugger("Scene Test Finished.")
         end, false)
+
+        AddEventHandler('onClientResourceStart', function(resourceName)
+            if GetCurrentResourceName() ~= resourceName then return end
+
+            if MBT and MBT.Minigames then
+                Utils.MbtDebugger("Minigames configuration loaded successfully.")
+            else
+                Utils.MbtDebugger("^1ERROR: Configuration table 'MBT.Minigames' not found!^7")
+            end
+        end)
     end
-
-    AddEventHandler('onClientResourceStart', function(resourceName)
-        if GetCurrentResourceName() ~= resourceName then return end
-
-        if MBT and MBT.Locale then
-            Utils.MbtDebugger("Locale system and Difficulty profiles loaded.")
-            Utils.MbtDebugger("Configuration loaded successfully.")
-        else
-            Utils.MbtDebugger("^1ERROR: Configuration table 'MBT.Locale' not found!^7")
-        end
-    end)
 end
 
 return Debug

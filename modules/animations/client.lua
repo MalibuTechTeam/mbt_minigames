@@ -106,19 +106,26 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
                     UseParticleFxAssetNextCall(fx.Asset)
                     local handle = StartParticleFxLoopedOnEntity(fx.Name, pObj, fx.Offset.x, fx.Offset.y,
                         fx.Offset.z, fx.Rot.x, fx.Rot.y, fx.Rot.z, fx.Scale or 1.0, true, true, true)
-                    SetParticleFxLoopedAlpha(handle, 1.0)
-                    table.insert(sceneFx,
-                        {
-                            handle = handle,
-                            asset = fx.Asset,
-                            name = fx.Name,
-                            obj = pObj,
-                            offset = fx.Offset,
-                            rot = fx.Rot,
-                            scale = fx.Scale,
-                            pulse = fx.Pulse,
-                            lastPulse = GetGameTimer()
-                        })
+                    if handle > 0 then
+                        SetParticleFxLoopedAlpha(handle, 1.0)
+                        table.insert(sceneFx,
+                            {
+                                handle = handle,
+                                asset = fx.Asset,
+                                name = fx.Name,
+                                obj = pObj,
+                                offset = fx.Offset,
+                                rot = fx.Rot,
+                                scale = fx.Scale,
+                                pulse = fx.Pulse,
+                                lastPulse = GetGameTimer()
+                            })
+                    else
+                        Utils.MbtDebugger("^1RunSequence: PTFX handle invalid for " .. tostring(fx.Name) .. "^7")
+                        RemoveNamedPtfxAsset(fx.Asset)
+                    end
+                else
+                    Utils.MbtDebugger("^1RunSequence: PTFX asset load timeout for " .. tostring(fx.Asset) .. "^7")
                 end
             end
         end
@@ -171,9 +178,12 @@ function Animations.UpdatePtfxPulse(sceneFx)
         if fx.pulse and (now - fx.lastPulse > fx.pulse) then
             StopParticleFxLooped(fx.handle, false)
             UseParticleFxAssetNextCall(fx.asset)
-            fx.handle = StartParticleFxLoopedOnEntity(fx.name, fx.obj, fx.offset.x, fx.offset.y, fx.offset.z,
+            local newHandle = StartParticleFxLoopedOnEntity(fx.name, fx.obj, fx.offset.x, fx.offset.y, fx.offset.z,
                 fx.rot.x, fx.rot.y, fx.rot.z, fx.scale or 1.0, true, true, true)
-            SetParticleFxLoopedAlpha(fx.handle, 1.0)
+            if newHandle > 0 then
+                SetParticleFxLoopedAlpha(newHandle, 1.0)
+                fx.handle = newHandle
+            end
             fx.lastPulse = now
         end
     end

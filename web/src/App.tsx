@@ -1,5 +1,8 @@
 import React, { useEffect } from "react";
 import { useMinigameStore } from "./store/useMinigameStore";
+import type { MinigameType } from "./store/useMinigameStore";
+
+const VALID_GAME_TYPES: MinigameType[] = ["hacking", "wire_fix", "bolt_turn", "code_match"];
 import { AnimatePresence, motion } from "framer-motion";
 import HackingGame from "./components/minigames/HackingGame";
 import WireFixGame from "./components/minigames/WireFixGame";
@@ -15,9 +18,11 @@ const App: React.FC = () => {
       const data = event.data;
       if (data.Action === "handleUI") {
         if (data.Status) {
-          const type = data.Payload.Type || "hacking";
+          const raw = data.Payload.Type as string;
+          const type = VALID_GAME_TYPES.includes(raw as MinigameType) ? (raw as MinigameType) : null;
+          if (!type) return;
           openGame(
-            type as any,
+            type,
             data.Payload.Id,
             data.Payload.TimeLimit,
             data.Payload.Params,

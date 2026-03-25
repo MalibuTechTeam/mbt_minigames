@@ -47,10 +47,60 @@ const getRotatedConnections = (
   return result as ConnectionArray;
 };
 
+// Pure BFS power propagation — runs synchronously, returns a new grid and win flag.
+// This must live outside the component to avoid stale-closure issues with React
+// functional state updates (which run asynchronously during the render phase).
+const computePowerState = (
+  currentGrid: GridTile[][],
+  sRow: number,
+  eRow: number,
+  numRows: number,
+  numCols: number,
+): { newGrid: GridTile[][]; reachedEnd: boolean } => {
+  const nextGrid = currentGrid.map((row) =>
+    row.map((cell) => ({ ...cell, powered: false })),
+  );
+  const visited = new Set<string>();
+  const queue: { r: number; c: number; incomingDir: number }[] = [];
+  // Power enters from the left of the start row (incomingDir 3 = LEFT port)
+  queue.push({ r: sRow, c: 0, incomingDir: 3 });
+  let reachedEnd = false;
+
+  while (queue.length > 0) {
+    const { r, c, incomingDir } = queue.shift()!;
+    if (r < 0 || r >= numRows || c < 0 || c >= numCols) continue;
+    const cellId = `${r}-${c}`;
+    if (visited.has(cellId)) continue;
+
+    const cell = nextGrid[r][c];
+    const def = TILE_DICTIONARY[cell.type];
+    const conns = getRotatedConnections(def.connections, cell.rotation);
+
+    if (conns[incomingDir]) {
+      cell.powered = true;
+      visited.add(cellId);
+
+      // Win: reached the right edge of the end row AND exits to the right
+      if (c === numCols - 1 && r === eRow && conns[1]) {
+        reachedEnd = true;
+      }
+
+      // Propagate: 0=TOP→r-1 (incomingDir 2), 1=RIGHT→c+1 (incomingDir 3),
+      //            2=BOTTOM→r+1 (incomingDir 0), 3=LEFT→c-1 (incomingDir 1)
+      if (conns[0]) queue.push({ r: r - 1, c, incomingDir: 2 });
+      if (conns[1]) queue.push({ r, c: c + 1, incomingDir: 3 });
+      if (conns[2]) queue.push({ r: r + 1, c, incomingDir: 0 });
+      if (conns[3]) queue.push({ r, c: c - 1, incomingDir: 1 });
+    }
+  }
+
+  return { newGrid: nextGrid, reachedEnd };
+};
+
 const WireFixGame: React.FC = () => {
   const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
     useMinigameStore();
-  const wireLocale = locale?.wire_fix || {};
+  const wireLocale = locale || {};
 
   // Difficulty mapping (wireCount acts as grid size)
   const cols = gameParams.wireCount ? Math.max(4, gameParams.wireCount + 1) : 5;
@@ -75,6 +125,11 @@ const WireFixGame: React.FC = () => {
     successSound.current = new Audio("assets/success.ogg");
     failedSound.current = new Audio("assets/failed.ogg");
     turnSound.current = new Audio("assets/hover.ogg");
+    return () => {
+      successSound.current?.pause();
+      failedSound.current?.pause();
+      turnSound.current?.pause();
+    };
   }, []);
 
   // Map Generation
@@ -93,9 +148,10 @@ const WireFixGame: React.FC = () => {
       })),
     );
 
-    // 2. Randomly pick start and end rows
+    // 2. Randomly pick start and end rows (ensure they differ when possible)
     const sRow = Math.floor(Math.random() * rows);
-    const eRow = Math.floor(Math.random() * rows);
+    let eRow = Math.floor(Math.random() * rows);
+    if (rows > 1 && eRow === sRow) eRow = (sRow + 1) % rows;
     setStartRow(sRow);
     setEndRow(eRow);
 
@@ -190,19 +246,38 @@ const WireFixGame: React.FC = () => {
       }
     }
 
-    // 5. Ensure the start tile connects to the left port by rotating it until currentConnections[3] is true
+    // 5. Ensure the start tile connects to the left port
     const startTile = newGrid[sRow][0];
-    const def = TILE_DICTIONARY[startTile.type];
+    const startDef = TILE_DICTIONARY[startTile.type];
     for (let rot = 0; rot < 4; rot++) {
-      const connections = getRotatedConnections(def.connections, rot);
+      const connections = getRotatedConnections(startDef.connections, rot);
       if (connections[3]) {
-        // 3 is LEFT
         startTile.rotation = rot;
         break;
       }
     }
 
-    setGrid(newGrid);
+    // 6. Ensure the end tile has a valid rotation: must both receive power from
+    //    the incoming path direction AND exit to the right (connections[1]).
+    const endTile = newGrid[eRow][cols - 1];
+    const endDef = TILE_DICTIONARY[endTile.type];
+    const secondToLast = pathCoords[pathCoords.length - 2];
+    const lastCoord   = pathCoords[pathCoords.length - 1];
+    // Determine which direction power arrives into the end tile
+    let endIncomingDir = 3; // default: from left
+    if (secondToLast.r < lastCoord.r)      endIncomingDir = 0; // came from above
+    else if (secondToLast.r > lastCoord.r) endIncomingDir = 2; // came from below
+    for (let rot = 0; rot < 4; rot++) {
+      const connections = getRotatedConnections(endDef.connections, rot);
+      if (connections[endIncomingDir] && connections[1]) {
+        endTile.rotation = rot;
+        break;
+      }
+    }
+
+    // 7. Compute initial power state (shows which tiles are powered at start)
+    const { newGrid: poweredGrid } = computePowerState(newGrid, sRow, eRow, rows, cols);
+    setGrid(poweredGrid);
   }, [rows, cols]);
 
   // Timer
@@ -220,7 +295,7 @@ const WireFixGame: React.FC = () => {
     return () => clearInterval(interval);
   }, [status]);
 
-  const handleEnd = (win: boolean) => {
+  const handleEnd = useCallback((win: boolean) => {
     if (hasEndedRef.current) return;
     hasEndedRef.current = true;
     setStatus(win ? "won" : "lost");
@@ -231,91 +306,7 @@ const WireFixGame: React.FC = () => {
     }
     fetchNui("minigameEnd", { outcome: win, sessionId });
     setTimeout(closeGame, 2500);
-  };
-
-  // Perform Power Pathfinding
-  const updatePowerState = useCallback(() => {
-    let reachedEndSignal = false;
-    setGrid((prevGrid) => {
-      // Deep copy grid to reset power
-      let nextGrid = prevGrid.map((row) =>
-        row.map((cell) => ({ ...cell, powered: false })),
-      );
-
-      if (!nextGrid || nextGrid.length === 0) return prevGrid;
-
-      const visited = new Set<string>();
-      const queue: { r: number; c: number; incomingDir: number }[] = [];
-
-      // Power always enters from the left edge of the startRow
-      // So we inject power going RIGHT into the startRow, col 0.
-      // Incoming dir to the first cell is from the LEFT (index 3)
-      queue.push({ r: startRow, c: 0, incomingDir: 3 });
-
-      let reachedEnd = false;
-
-      while (queue.length > 0) {
-        const { r, c, incomingDir } = queue.shift()!;
-        if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
-
-        const cellId = `${r}-${c}`;
-        if (visited.has(cellId)) continue;
-
-        const cell = nextGrid[r][c];
-        const def = TILE_DICTIONARY[cell.type];
-        const currentConnections = getRotatedConnections(
-          def.connections,
-          cell.rotation,
-        );
-
-        // Check if the cell can receive power from the incoming direction
-        if (currentConnections[incomingDir]) {
-          cell.powered = true;
-          visited.add(cellId);
-
-          // If this is the end cell on the final column, check if power can EXIT to the right
-          if (c === cols - 1 && r === endRow) {
-            if (currentConnections[1]) {
-              // Exiting Right
-              reachedEnd = true;
-            }
-          }
-
-          // Propagate power to adjacent connected cells
-          // Check flow relative to self
-          // 0: TOP, goes to r-1, c (incoming for them is BOTTOM/2)
-          if (currentConnections[0])
-            queue.push({ r: r - 1, c, incomingDir: 2 });
-          // 1: RIGHT, goes to r, c+1 (incoming for them is LEFT/3)
-          if (currentConnections[1])
-            queue.push({ r, c: c + 1, incomingDir: 3 });
-          // 2: BOTTOM, goes to r+1, c (incoming for them is TOP/0)
-          if (currentConnections[2])
-            queue.push({ r: r + 1, c, incomingDir: 0 });
-          // 3: LEFT, goes to r, c-1 (incoming for them is RIGHT/1)
-          if (currentConnections[3])
-            queue.push({ r, c: c - 1, incomingDir: 1 });
-        }
-      }
-
-      if (reachedEnd) {
-        reachedEndSignal = true;
-      }
-
-      return nextGrid;
-    });
-    if (reachedEndSignal) {
-      handleEnd(true);
-    }
-  }, [cols, rows, startRow, endRow, handleEnd]);
-
-  // Run pathfinding on initial mount and when grid changes manually (via rotation)
-  useEffect(() => {
-    if (grid.length > 0 && status === "playing") {
-      updatePowerState();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startRow, endRow]); // Only strictly depend on dimensions or setup, rotation triggers it manually
+  }, [sessionId, closeGame]);
 
   const handleTileClick = (r: number, c: number) => {
     if (status !== "playing") return;
@@ -325,16 +316,31 @@ const WireFixGame: React.FC = () => {
       turnSound.current.play().catch(() => {});
     }
 
-    setGrid((prev) => {
-      const next = [...prev];
-      next[r] = [...next[r]];
-      next[r][c] = { ...next[r][c], rotation: (next[r][c].rotation + 1) % 4 };
-      return next;
-    });
+    // Rotate the clicked tile, then immediately compute new power state synchronously.
+    // This avoids the React async state-update trap: passing a function to setGrid
+    // does NOT run it synchronously, so any win-flag set inside it would be invisible
+    // to code running after setGrid() returns.
+    const next = grid.map((row, ri) =>
+      row.map((cell, ci) => ({
+        ...cell,
+        rotation:
+          ri === r && ci === c ? (cell.rotation + 1) % 4 : cell.rotation,
+      })),
+    );
 
-    // We need to defer the pathfinding slightly to ensure state is updated, or we can just trigger it.
-    // Easiest is to queue a microtask or useEffect, but we can also just call our useCallback that uses functional state updates.
-    setTimeout(() => updatePowerState(), 10);
+    const { newGrid: poweredGrid, reachedEnd } = computePowerState(
+      next,
+      startRow,
+      endRow,
+      rows,
+      cols,
+    );
+
+    setGrid(poweredGrid);
+
+    if (reachedEnd) {
+      handleEnd(true);
+    }
   };
 
   // SVG Render helpers for tiles

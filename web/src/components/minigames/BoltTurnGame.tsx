@@ -58,7 +58,7 @@ const CurvedGauge: React.FC<{ value: number; label: string }> = ({
 const BoltTurnGame: React.FC = () => {
   const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
     useMinigameStore();
-  const boltLocale = locale?.bolt_turn || {};
+  const boltLocale = locale || {};
   const initialTimeLimit = useRef(
     gameParams.timeLimit || timeLimit || 45,
   ).current;
@@ -105,13 +105,14 @@ const BoltTurnGame: React.FC = () => {
     errorSound.current = new Audio("assets/error.ogg");
 
     return () => {
-      if (turnSound.current) {
-        turnSound.current.pause();
-        turnSound.current = null;
-      }
-      if (successSound.current) successSound.current.pause();
-      if (failedSound.current) failedSound.current.pause();
-      if (errorSound.current) errorSound.current.pause();
+      successSound.current?.pause();
+      failedSound.current?.pause();
+      turnSound.current?.pause();
+      errorSound.current?.pause();
+      successSound.current = null;
+      failedSound.current = null;
+      turnSound.current = null;
+      errorSound.current = null;
     };
   }, []);
 

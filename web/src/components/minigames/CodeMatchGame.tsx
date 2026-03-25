@@ -16,7 +16,7 @@ interface StreamItem {
 const CodeMatchGame: React.FC = () => {
   const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
     useMinigameStore();
-  const codeLocale = locale?.code_match || {};
+  const codeLocale = locale || {};
 
   const initialTimeLimit = useRef(timeLimit || 30).current;
   const [timeLeft, setTimeLeft] = useState(initialTimeLimit);
@@ -69,6 +69,12 @@ const CodeMatchGame: React.FC = () => {
     errorSound.current = new Audio("assets/error.ogg");
     winSound.current = new Audio("assets/success.ogg");
     loseSound.current = new Audio("assets/failed.ogg");
+    return () => {
+      findSound.current?.pause();
+      errorSound.current?.pause();
+      winSound.current?.pause();
+      loseSound.current?.pause();
+    };
   }, []);
 
   const generateRandomCode = () => {
