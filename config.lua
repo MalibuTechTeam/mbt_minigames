@@ -6,16 +6,16 @@ MBT.DefaultDifficulty = "Easy"
 MBT.Minigames = {
 	['hacking'] = {
 		locale = {
-			label         = "Hacking",
-			title         = "TERMINAL NODE DECRYPTION",
-			instruction   = "IDENTIFY SEQUENCE PATTERN IN DESIGNATED ORDER",
-			target_label  = "TARGET SEQUENCE",
-			errors_label  = "ERRORS",
-			granted       = "ACCESS GRANTED",
-			granted_sub   = "SYSTEM OVERRIDE COMPLETE",
-			denied        = "ACCESS DENIED",
-			denied_sub    = "SECURITY PROTOCOL TRIGGERED",
-			boot_lines    = {
+			label        = "Hacking",
+			title        = "TERMINAL NODE DECRYPTION",
+			instruction  = "IDENTIFY SEQUENCE PATTERN IN DESIGNATED ORDER",
+			target_label = "TARGET SEQUENCE",
+			errors_label = "ERRORS",
+			granted      = "ACCESS GRANTED",
+			granted_sub  = "SYSTEM OVERRIDE COMPLETE",
+			denied       = "ACCESS DENIED",
+			denied_sub   = "SECURITY PROTOCOL TRIGGERED",
+			boot_lines   = {
 				"[ KERNEL ] LOADING NEURAL MODULES...",
 				"[ MEMORY ] INTEG_CHECK: 0x5F3A... PASS",
 				"[ NET ] BYPASSING FIREWALL (PORT 8080)...",
@@ -53,7 +53,7 @@ MBT.Minigames = {
 			Dict           = "amb@world_human_welding@male@base",
 			Loop           = "base",
 			EnterPropDelay = 0,
-			Props = {
+			Props          = {
 				{
 					Model  = "prop_weld_torch",
 					Bone   = 28422,
@@ -67,7 +67,7 @@ MBT.Minigames = {
 					Rot    = vector3(0.0, 90.0, 180.0)
 				}
 			},
-			Particles = {
+			Particles      = {
 				{
 					PropIndex = 1,
 					Asset     = "core",
@@ -117,7 +117,7 @@ MBT.Minigames = {
 			Loop           = "drill_straight_idle",
 			EnterTime      = 1200,
 			EnterPropDelay = 0,
-			Props = {
+			Props          = {
 				{
 					Model  = "hei_prop_heist_drill",
 					Bone   = 28422,
@@ -147,19 +147,19 @@ MBT.Minigames = {
 			Loop           = "base",
 			LoopFlag       = 49,
 			EnterPropDelay = 0,
-			Props = {
+			Props          = {
 				{
 					Model  = "prop_cs_tablet",
-					Bone   = 60309, -- PH_L_Hand
+					Bone   = 60309,
 					Offset = vector3(0.03, 0.002, -0.0),
 					Rot    = vector3(10.0, 160.0, 0.0)
 				}
 			}
 		},
 		difficulties = {
-			Easy   = { time = 30, segmentCount = 4, shiftSpeed = 1200, maxMistakes = 4 },
-			Medium = { time = 35, segmentCount = 6, shiftSpeed = 900,  maxMistakes = 3 },
-			Hard   = { time = 25, segmentCount = 8, shiftSpeed = 600,  maxMistakes = 2 }
+			Easy   = { time = 20, segmentCount = 6, shiftSpeed = 600, maxMistakes = 4 },
+			Medium = { time = 25, segmentCount = 8, shiftSpeed = 600, maxMistakes = 3 },
+			Hard   = { time = 30, segmentCount = 10, shiftSpeed = 600, maxMistakes = 2 }
 		}
 	}
 }

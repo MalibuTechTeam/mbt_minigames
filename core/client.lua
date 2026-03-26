@@ -3,7 +3,6 @@ local Sessions = loadModule('modules.sessions.client')
 local Animations = loadModule('modules.animations.client')
 local Debug = loadModule('modules.debug.client')
 
--- Track active scene objects for emergency cleanup on resource stop
 local activeSceneProps = {}
 local activeSceneFx = {}
 
