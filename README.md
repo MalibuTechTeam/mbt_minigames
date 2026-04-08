@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/FiveM-GTA%20V-orange?style=flat-square"/>
   <img src="https://img.shields.io/badge/Lua-5.4-blueviolet?style=flat-square"/>
   <img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square"/>
-  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square"/>
+  <img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue?style=for-the-badge" alt="PolyForm Noncommercial 1.0.0" />
 </p>
 
 </div>
@@ -171,8 +171,8 @@ Enable with `MBT.Debug = true` in `config.lua`:
 
 ## License
 
-This project is licensed under the PolyForm Noncommercial License 1.0.0.
+This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
 
-You are free to use and modify this software for noncommercial purposes only — personal use, hobby servers, research, and education. Any commercial use, redistribution for profit, or inclusion in paid products is prohibited without written permission from Malibu Tech Team.
+You are free to use and modify this software for **noncommercial purposes only** — personal use, hobby servers, research, and education. Any commercial use, redistribution for profit, or inclusion in paid products is prohibited without written permission from Malibu Tech Team.
 
 ##### Copyright © 2026 [Malibù Tech](https://github.com/MalibuTechTeam). All rights reserved.
