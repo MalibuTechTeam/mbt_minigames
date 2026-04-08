@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".github/mbt_minigames_github.png" width="100%"/>
+<img src="https://r2.fivemanage.com/dPa5OqQoEubnwFkRaIgUq/ScreenShot/thumb_mbt_minigames.png" width="100%"/>
 
 <h1>mbt_minigames</h1>
 
@@ -56,11 +56,6 @@ Mixing incompatible versions will cause minigames to not trigger correctly.
 1. Download the latest release and drop the `mbt_minigames` folder into your `resources` directory
 2. Add `ensure mbt_minigames` to your `server.cfg` **before** any resource that depends on it
 3. Restart the server
-
-> If you modify the web UI source, rebuild it with:
-> ```bash
-> cd web && pnpm install && pnpm build
-> ```
 
 ---
 
@@ -174,20 +169,10 @@ Enable with `MBT.Debug = true` in `config.lua`:
 
 ---
 
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Game scripts | Lua 5.4 |
-| UI framework | React 19 + TypeScript |
-| Animations | Framer Motion |
-| State management | Zustand |
-| Build tool | Vite + pnpm |
-
----
-
 ## License
 
-MIT — free to use and modify. Attribution appreciated.
+This project is licensed under the PolyForm Noncommercial License 1.0.0.
+
+You are free to use and modify this software for noncommercial purposes only — personal use, hobby servers, research, and education. Any commercial use, redistribution for profit, or inclusion in paid products is prohibited without written permission from Malibu Tech Team.
 
 ##### Copyright © 2026 [Malibù Tech](https://github.com/MalibuTechTeam). All rights reserved.
