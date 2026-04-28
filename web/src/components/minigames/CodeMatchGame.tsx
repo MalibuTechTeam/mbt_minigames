@@ -57,8 +57,6 @@ const CodeMatchGame: React.FC = () => {
   const DISTANCE_TO_SCANNER_VH =
     START_OFFSET_VH + ITEM_HEIGHT_VH / 2 - SCANNER_CENTER_VH;
   const TIME_TO_SCANNER_SEC = DISTANCE_TO_SCANNER_VH / SPEED_VH_PER_SEC;
-
-  // Refs for audio
   const findSound = useRef<HTMLAudioElement | null>(null);
   const errorSound = useRef<HTMLAudioElement | null>(null);
   const winSound = useRef<HTMLAudioElement | null>(null);
@@ -96,7 +94,6 @@ const CodeMatchGame: React.FC = () => {
     };
   };
 
-  // Initialize game
   useEffect(() => {
     if (didInit.current) return;
     didInit.current = true;
@@ -131,7 +128,6 @@ const CodeMatchGame: React.FC = () => {
     segmentCount,
   ]);
 
-  // physics loop
   useEffect(() => {
     if (status !== "playing") return;
 
@@ -140,7 +136,6 @@ const CodeMatchGame: React.FC = () => {
     }
 
     const animate = (time: DOMHighResTimeStamp) => {
-      // Use performance.now() as fallback to guarantee absolute time delta
       if (startTimeRef.current === undefined) startTimeRef.current = time;
       const elapsed = time - startTimeRef.current;
       const currentY = START_OFFSET_VH - (elapsed / 1000) * SPEED_VH_PER_SEC;
@@ -149,7 +144,6 @@ const CodeMatchGame: React.FC = () => {
         containerRef.current.style.transform = `translateY(${currentY}vh)`;
       }
 
-      // Miss Detection Logic
       if (
         targets.length > 0 &&
         currentTargetIndexRef.current < targets.length

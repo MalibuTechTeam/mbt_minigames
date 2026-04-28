@@ -156,13 +156,12 @@
     position: relative;
     overflow: hidden;
     background: rgba(0, 0, 0, 0.8);
-    height: 100%; /* Ensure layout takes full available height */
+    height: 100%; 
 }
 
 .grid-container {
     flex: 1;
     display: grid;
-    /* Explicitly define rows and ensure container height is respected */
     grid-template-columns: repeat(8, 1fr);
     grid-template-rows: repeat(8, 1fr);
     gap: 0.4vmin;
@@ -170,7 +169,7 @@
     background: rgba(0, 20, 40, 0.5);
     border: 1px solid rgba(0, 242, 255, 0.2);
     border-radius: 4px;
-    height: 100%; /* Force grid to fill vertical space */
+    height: 100%; 
     box-sizing: border-box;
     align-content: stretch;
 }

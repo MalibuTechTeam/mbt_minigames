@@ -4,7 +4,6 @@ import { fetchNui } from "../../utils/fetchNui";
 import { motion, AnimatePresence } from "framer-motion";
 import "./BoltTurnGame.css";
 
-// --- Torque Physics Constants ---
 const TENSION_BUILD_RATE = 120; // Tension units per second when held
 const TENSION_DECAY_RATE = 180; // Tension units per second when released
 const MAX_TENSION = 100;
@@ -66,7 +65,7 @@ const BoltTurnGame: React.FC = () => {
 
   // Difficulty parameters
   const boltCount = gameParams.boltCount || 4;
-  const heatSpeed = gameParams.heatSpeed || 1.0; // Acts as sweetspot erraticism multiplier
+  const heatSpeed = gameParams.heatSpeed || 1.0;
   const maxErrors = gameParams.maxMistakes || 3;
 
   const [boltProgress, setBoltProgress] = useState<number[]>(
@@ -84,7 +83,6 @@ const BoltTurnGame: React.FC = () => {
   const [mistakes, setMistakes] = useState(0);
   const [errorLog, setErrorLog] = useState<string[]>([]);
 
-  // High-performance physics state (Bypassing React Renders)
   const tensionRefs = useRef<number[]>(new Array(boltCount).fill(0));
   const overheatedRef = useRef<boolean[]>(new Array(boltCount).fill(false));
   const boltProgressRef = useRef<number[]>(new Array(boltCount).fill(0));
@@ -116,7 +114,6 @@ const BoltTurnGame: React.FC = () => {
     };
   }, []);
 
-  // Timer
   useEffect(() => {
     if (status !== "playing") return;
     const timerInterval = setInterval(() => {
@@ -136,7 +133,6 @@ const BoltTurnGame: React.FC = () => {
     hasEndedRef.current = true;
     setStatus(win ? "won" : "lost");
 
-    // Stop any looping sounds immediately
     if (turnSound.current) {
       turnSound.current.pause();
       turnSound.current.currentTime = 0;
@@ -162,7 +158,6 @@ const BoltTurnGame: React.FC = () => {
         return next;
       });
 
-      // Drop tension back to 0 instantly when stripped
       tensionRefs.current[index] = 0;
       setActiveValve(null);
 
@@ -218,18 +213,14 @@ const BoltTurnGame: React.FC = () => {
     [maxErrors, boltLocale, status],
   );
 
-  // Main Physics Loop
   useEffect(() => {
     if (status !== "playing") return;
 
     const animate = (time: DOMHighResTimeStamp) => {
       if (lastTimeRef.current === undefined) lastTimeRef.current = time;
-      const deltaTime = (time - lastTimeRef.current) / 1000; // in seconds
+      const deltaTime = (time - lastTimeRef.current) / 1000;
       lastTimeRef.current = time;
 
-      // Calculate the shared shifting sweet spot center based on time and difficulty
-      // Using a sine wave combination to make it erratic but smooth
-      // Shifts between 20% and 80% tension
       const speedMult = 0.5 * heatSpeed;
       const baseSin = Math.sin(time * 0.001 * speedMult);
       const secondarySin = Math.sin(time * 0.0023 * speedMult);
@@ -238,7 +229,6 @@ const BoltTurnGame: React.FC = () => {
       const ssMin = sweetSpotCenter - SWEET_SPOT_WIDTH / 2;
       const ssMax = sweetSpotCenter + SWEET_SPOT_WIDTH / 2;
 
-      // Loop over all bolts to update their tension physics
       for (let i = 0; i < boltCount; i++) {
         const active = activeValve === i;
         let currentTension = tensionRefs.current[i];
@@ -254,42 +244,40 @@ const BoltTurnGame: React.FC = () => {
 
         currentTension = Math.max(0, currentTension);
 
-        if (currentTension >= MAX_TENSION && !isOH && boltProgressRef.current[i] < 100) {
+        if (
+          currentTension >= MAX_TENSION &&
+          !isOH &&
+          boltProgressRef.current[i] < 100
+        ) {
           currentTension = MAX_TENSION;
           triggerOverheat(i);
         }
 
         tensionRefs.current[i] = currentTension;
 
-        // Visual updates via DOM to avoid React GC stutters
         const needleEl = document.getElementById(`needle-${i}`);
         const arcEl = document.getElementById(`sweet-arc-${i}`);
         const tensionTextEl = document.getElementById(`tension-text-${i}`);
 
         if (needleEl) {
-          // Tension maps to 283 stroke-dasharray (full circle)
           const needleOffset = 283 - (283 * currentTension) / 100;
           needleEl.style.strokeDashoffset = needleOffset.toString();
 
           if (currentTension > ssMax) {
-            needleEl.style.stroke = "#ff3366"; // Too much force!
+            needleEl.style.stroke = "#ff3366";
           } else if (currentTension >= ssMin && currentTension <= ssMax) {
-            needleEl.style.stroke = "#39ff14"; // Perfect
+            needleEl.style.stroke = "#39ff14";
           } else {
-            needleEl.style.stroke = "#00f2ff"; // Too little force
+            needleEl.style.stroke = "#00f2ff";
           }
         }
 
         if (arcEl) {
-          // Sweet spot arc visual mapping
-          // Arc is drawn based on dasharray, we can map it roughly by rotating the SVG
           const ssWidthPct = SWEET_SPOT_WIDTH;
           const mapToDash = (ssWidthPct / 100) * 283;
           arcEl.style.strokeDasharray = `${mapToDash} 283`;
 
-          // Rotate the container to center the arc
-          // The arc starts at 0 (top/rotated to left), so we must offset it by ssMin
-          const rotationBase = -90; // Default SVG offset to top
+          const rotationBase = -90;
           const rotationAngle = rotationBase + (ssMin / 100) * 360;
 
           const svgArcContainer = document.getElementById(`arc-container-${i}`);
@@ -310,10 +298,8 @@ const BoltTurnGame: React.FC = () => {
     return () => {
       if (reqRef.current) cancelAnimationFrame(reqRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, activeValve, boltCount, heatSpeed, triggerOverheat]);
 
-  // Progress Checking Loop (React-friendly, 20fps)
   useEffect(() => {
     if (status !== "playing") return;
     const progressTimer = setInterval(() => {
@@ -553,7 +539,7 @@ const BoltTurnGame: React.FC = () => {
                       <circle
                         cx="50"
                         cy="50"
-                        r="30" /* Slightly smaller bolt to show tension ring outside */
+                        r="30"
                         fill="url(#knobGradient)"
                         stroke="#444"
                         strokeWidth="2"

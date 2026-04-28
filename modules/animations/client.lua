@@ -10,21 +10,17 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
     local animDict = finalAnimData.Dict
     Utils.LoadAnimDict(animDict)
 
-    -- Ensure character is unarmed to avoid prop interference
     SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true)
 
-    -- Pre-load ALL models upfront to prevent desync during the sequence
     Utils.MbtDebugger("RunSequence: Pre-loading assets...")
     for _, pDef in ipairs(finalAnimData.PreProps or {}) do Utils.LoadModel(pDef.Model) end
     for _, pDef in ipairs(finalAnimData.Props or {}) do Utils.LoadModel(pDef.Model) end
 
-    -- 0. Optional Pre-Enter
     if finalAnimData.PreEnter then
         local preDict = finalAnimData.PreEnterDict or animDict
         if DoesAnimDictExist(preDict) then
             Utils.LoadAnimDict(preDict)
 
-            -- Spawn PreProps
             local currentCoords = GetEntityCoords(ped)
             for _, pDef in ipairs(finalAnimData.PreProps or {}) do
                 local mHash = GetHashKey(pDef.Model)
@@ -54,7 +50,6 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
         end
     end
 
-    -- 1. Play Enter Animation First
     if finalAnimData.Enter then
         TaskPlayAnim(ped, animDict, finalAnimData.Enter, 8.0, -8.0, -1, finalAnimData.EnterFlag or 0, 0, false, false,
             false)
@@ -69,7 +64,6 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
         Citizen.Wait(finalAnimData.EnterPropDelay or 150)
     end
 
-    -- 2. Create and attach props
     local currentCoords = GetEntityCoords(ped)
     for propIndex, pDef in ipairs(finalAnimData.Props or {}) do
         local mHash = GetHashKey(pDef.Model)
@@ -94,7 +88,6 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
                 " attached? " .. tostring(attached) .. " handle: " .. tostring(pObj) .. " at Rot " .. tostring(rot))
         end
 
-        -- Support PTFX anchored to the prop
         for _, fx in ipairs(finalAnimData.Particles or {}) do
             if fx.PropIndex == propIndex then
                 RequestNamedPtfxAsset(fx.Asset)
@@ -131,13 +124,11 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
         end
     end
 
-    -- 3. Wait for Enter to finish
     if finalAnimData.Enter then
         local remainingWait = (finalAnimData.EnterTime or 2000) - (finalAnimData.EnterPropDelay or 150)
         if remainingWait > 0 then Citizen.Wait(remainingWait) end
     end
 
-    -- 4. Play Loop Animation
     if finalAnimData.Loop and finalAnimData.Enter then
         TaskPlayAnim(ped, animDict, finalAnimData.Loop, 8.0, -8.0, -1, finalAnimData.LoopFlag or 1, 0, false, false,
             false)

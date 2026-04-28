@@ -81,7 +81,6 @@ const HackingGame: React.FC = () => {
 
   const hasEndedRef = useRef(false);
 
-  // Sound refs using local assets - relative path for production build
   const hoverSound = useRef<HTMLAudioElement | null>(null);
   const clickSound = useRef<HTMLAudioElement | null>(null);
   const errorSound = useRef<HTMLAudioElement | null>(null);
