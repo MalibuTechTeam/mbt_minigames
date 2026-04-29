@@ -10,7 +10,7 @@ function loadModule(path)
 
     local code = LoadResourceFile(GetCurrentResourceName(), path .. ".lua")
     if code then
-        local f, err = load(code, "/" .. path .. ".lua")
+        local f, err = load(code, "@" .. path .. ".lua")
         if f then
             local ok, res = pcall(f)
             if ok then

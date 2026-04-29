@@ -38,17 +38,17 @@ end
 ---@param ... any
 function Utils.mbtDebugger(...)
     if not MBT.Debug then return end
-    print(("^2[%s]^7 ^3%s^7 \xc2\xbb %s^0"):format(_resName, _callerLoc(3), _parts(...)))
+    print(("^2[%s]^0 ^3%s^0 \xc2\xbb %s^0"):format(_resName, _callerLoc(3), _parts(...)))
 end
 
 ---@param ... any
 function Utils.mbtWarn(...)
-    print(("^2[%s]^7 ^3[WARN] %s^7 \xc2\xbb %s^0"):format(_resName, _callerLoc(3), _parts(...)))
+    print(("^2[%s]^0 ^3[WARN] %s^0 \xc2\xbb %s^0"):format(_resName, _callerLoc(3), _parts(...)))
 end
 
 ---@param ... any
 function Utils.mbtError(...)
-    print(("^2[%s]^7 ^1[ERROR] %s^7 \xc2\xbb %s^0"):format(_resName, _callerLoc(3), _parts(...)))
+    print(("^2[%s]^0 ^1[ERROR] %s^0 \xc2\xbb %s^0"):format(_resName, _callerLoc(3), _parts(...)))
 end
 
 ---@param animdict string
