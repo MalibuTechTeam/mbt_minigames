@@ -60,6 +60,11 @@ jobs:
             echo "IS_PRERELEASE=false" >> $GITHUB_ENV
           fi
 
+      - name: Checkout branch for manifest bump
+        run: |
+          BRANCH=$(git branch -r --contains HEAD | grep -v HEAD | sed 's|origin/||' | xargs | awk '{print $1}')
+          git checkout $BRANCH
+
       - name: Bump manifest version
         run: node .github/actions/bump-manifest-version.js
         env:
