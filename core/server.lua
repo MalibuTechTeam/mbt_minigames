@@ -33,8 +33,8 @@ function MbtVersionCheck(repository)
 
 					if current ~= minimum then
 						if current < minimum then
-							return print(('^3An update is available for %s (current version: %s)\r\n%s^0'):format(
-								resource, currentVersion, response.html_url))
+							return print(("\n^2[Malibù Tech]^0 ^3%s — update available | %s → %s\n↳ Download: %s^0"):format(
+								resource, currentVersion, latestVersion, response.html_url))
 						else
 							break
 						end

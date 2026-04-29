@@ -12,14 +12,6 @@ function Utils.MbtDebugger(...)
     end
 end
 
-function Utils.GenerateSessionId()
-    local randomStr = ""
-    for i = 1, 20 do
-        randomStr = randomStr .. string.char(math.random(97, 122))
-    end
-    return randomStr
-end
-
 ---@param animdict string
 ---@return boolean
 function Utils.LoadAnimDict(animdict)

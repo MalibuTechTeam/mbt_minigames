@@ -13,24 +13,52 @@ jobs:
 
     steps:
       - name: Install archive tools
-        run: sudo apt install zip
+        run: sudo apt-get install -y zip
 
       - name: Checkout source code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v2.2.2
+        uses: pnpm/action-setup@v3
         with:
-          version: 8.1.1
+          version: 9.7.0
 
-      - name: Get variables
+      - name: Install & Build Web UI
+        working-directory: ./web
+        run: |
+          pnpm install
+          pnpm build
+
+      - name: Get variables & Tag Message
         id: get_vars
         run: |
-          echo '::set-output name=SHORT_SHA::$(git rev-parse --short HEAD)'
-          echo '::set-output name=DATE::$(date +'%D')'
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "DATE=$(date +'%d-%m-%Y')" >> $GITHUB_ENV
+
+          TAG_MSG=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
+
+          if [ -z "$TAG_MSG" ]; then
+            TAG_MSG="${{ github.event.head_commit.message }}"
+          fi
+
+          {
+            echo 'CHANGELOG<<EOF'
+            echo "$TAG_MSG"
+            echo 'EOF'
+          } >> $GITHUB_ENV
+
+          if [[ "${{ github.ref_name }}" == *"-"* ]]; then
+            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
+          else
+            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
+          fi
 
       - name: Bump manifest version
         run: node .github/actions/bump-manifest-version.js
@@ -38,16 +66,13 @@ jobs:
           TGT_RELEASE_VERSION: ${{ github.ref_name }}
 
       - name: Push manifest change
-        uses: EndBug/add-and-commit@v8
+        uses: EndBug/add-and-commit@v9
         with:
           add: fxmanifest.lua
           push: true
           author_name: Manifest Bumper
           author_email: 41898282+github-actions[bot]@users.noreply.github.com
           message: "chore: bump manifest version to ${{ github.ref_name }}"
-
-      - name: Check github.ref_name
-        run: echo ${{ github.ref_name }}
 
       - name: Update tag ref
         uses: EndBug/latest-tag@latest
@@ -57,26 +82,20 @@ jobs:
       - name: Bundle files
         run: |
           mkdir -p ./temp/mbt_minigames
-          cp ./{README.md,fxmanifest.lua} ./temp/mbt_minigames
-          cp -r ./{core,web} ./temp/mbt_minigames
+
+          cp ./{README.md,config.lua,fxmanifest.lua} ./temp/mbt_minigames/
+
+          cp -r ./{core,modules} ./temp/mbt_minigames/
+
+          mkdir -p ./temp/mbt_minigames/web
+          cp -r ./web/dist ./temp/mbt_minigames/web/
+
           cd ./temp && zip -r ../mbt_minigames.zip ./mbt_minigames
 
-      - name: Create Release
-        uses: "marvinpinto/action-automatic-releases@v1.2.1"
-        id: auto_release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          title: "${{ env.RELEASE_VERSION }}"
-          prerelease: false
           files: mbt_minigames.zip
-
-        env:
-          CI: false
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get current date
-        if: inputs.releaseVersion == ''
-        id: date
-        uses: Kaven-Universe/github-action-current-date-time@v1
-        with:
-          format: "DD-MM-YYYY"
+          name: ${{ github.ref_name }}
+          body: ${{ env.CHANGELOG }}
+          prerelease: ${{ env.IS_PRERELEASE }}
