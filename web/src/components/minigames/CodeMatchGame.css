@@ -1,0 +1,300 @@
+.codematch-container {
+    background: #0a0a0c;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 2vmin;
+    box-sizing: border-box;
+    overflow: hidden;
+    color: #39ff14; /* Standard neon green */
+    border-radius: 4px;
+    /* Technical Grid Background */
+    background-image: 
+        linear-gradient(rgba(57, 255, 20, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(57, 255, 20, 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+    z-index: 1;
+}
+
+/* CRT & Scanline Effects */
+.codematch-container::before {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+    z-index: 10;
+    background-size: 100% 4px, 3px 100%;
+    pointer-events: none;
+    opacity: 0.4;
+}
+
+.codematch-content-shaker {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
+.codematch-content-shaker.flash-error {
+    animation: codematch-glitch-shake 0.3s infinite;
+    background-color: #1a000a !important;
+    box-shadow: inset 0 0 50px rgba(255, 0, 102, 0.4);
+}
+
+@keyframes codematch-glitch-shake {
+    0% { transform: translate(0,0); filter: hue-rotate(0deg); }
+    20% { transform: translate(-3px, 2px); filter: hue-rotate(45deg); }
+    40% { transform: translate(3px, -2px); filter: hue-rotate(90deg); }
+    60% { transform: translate(-3px, -1px); }
+    80% { transform: translate(3px, 1px); }
+    100% { transform: translate(0,0); }
+}
+
+/* HEADER */
+.codematch-header {
+    border-bottom: 2px solid rgba(57, 255, 20, 0.3);
+    padding-bottom: 1.5vmin;
+    margin-bottom: 2.5vmin;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.2vmin;
+}
+
+.header-middle {
+    font-weight: 900;
+    color: #fff;
+    background: rgba(57, 255, 20, 0.15);
+    padding: 0.6vmin 3vmin;
+    border: 1px solid #39ff14;
+    border-radius: 4px;
+    box-shadow: 0 0 15px rgba(57, 255, 20, 0.3);
+    text-shadow: 0 0 10px #39ff14;
+    font-size: 1.8vmin;
+}
+
+.header-side {
+    font-size: 1.4vmin;
+    color: rgba(57, 255, 20, 0.7);
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.header-right { text-align: right; }
+
+/* TARGET DISPLAY */
+.target-display {
+    background: rgba(0, 20, 0, 0.6);
+    padding: 2vmin;
+    text-align: center;
+    border: 1px solid rgba(57, 255, 20, 0.5);
+    margin-bottom: 3vmin;
+    position: relative;
+    backdrop-filter: blur(5px);
+    box-shadow: inset 0 0 20px rgba(57, 255, 20, 0.1);
+}
+
+.target-label {
+    position: absolute;
+    top: -1vmin;
+    left: 2vmin;
+    background: #0a0a0c;
+    padding: 0 1vmin;
+    font-size: 1.1vmin;
+    color: #39ff14;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.1vmin;
+}
+
+.target-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 5vmin !important;
+    letter-spacing: 1.5vmin;
+    color: #39ff14;
+    text-shadow: 0 0 20px rgba(57, 255, 20, 0.6);
+    font-weight: 900;
+}
+
+/* STREAM AREA */
+.stream-area {
+    height: 40vh;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(57, 255, 20, 0.2);
+    background: rgba(0, 0, 0, 0.4);
+    box-shadow: inset 0 0 2vmin rgba(57, 255, 20, 0.05);
+}
+
+.scanline-bar {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 0.4vmin;
+    background: rgba(57, 255, 20, 0.2);
+    box-shadow: 0 0 10px #39ff14;
+    z-index: 5;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+/* New Focus Brackets */
+.scanner-bracket {
+    position: absolute;
+    top: 16vh;
+    left: 2vmin;
+    right: 2vmin;
+    height: 8vh;
+    border-left: 4px solid #39ff14;
+    border-right: 4px solid #39ff14;
+    background: rgba(57, 255, 20, 0.05); /* very light tint */
+    pointer-events: none;
+    z-index: 4;
+    border-radius: 4px;
+    box-shadow: inset 20px 0 30px -20px rgba(57, 255, 20, 0.2), 
+                inset -20px 0 30px -20px rgba(57, 255, 20, 0.2);
+}
+
+.scanner-bracket::before, .scanner-bracket::after {
+    content: '';
+    position: absolute;
+    width: 15px;
+    height: 4px;
+    background: #39ff14;
+}
+
+.scanner-bracket::before { top: 0; left: 0; }
+.scanner-bracket::after { bottom: 0; right: 0; }
+
+.stream-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0; 
+    will-change: transform;
+}
+
+
+.stream-item {
+    height: 8vh;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 4vmin;
+    font-size: 2.5vmin;
+    color: rgba(57, 255, 20, 0.8);
+    font-family: monospace;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.stream-item:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.015);
+}
+
+.stream-item.hit-success {
+    background-color: rgba(57, 255, 20, 0.5);
+    color: #fff;
+    text-shadow: 0 0 10px #fff;
+}
+
+.memory-addr {
+    font-size: 1.2vmin;
+    opacity: 0.15; /* Dimmer */
+    color: #fff;
+    font-weight: 400;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.code-val {
+    letter-spacing: 0.8vmin; /* Add spacing so C41F looks like C 4 1 F */
+    text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
+}
+
+.action-hint {
+    position: absolute;
+    bottom: 2vmin;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.8vmin;
+    color: #39ff14;
+    letter-spacing: 0.2vmin;
+    text-shadow: 0 0 10px rgba(57, 255, 20, 0.6);
+    z-index: 500;
+    animation: codematch-pulse 2s infinite;
+    pointer-events: none;
+    background: rgba(10, 10, 12, 0.9);
+    padding: 0.5vmin 3vmin;
+    border-radius: 4px;
+    border: 1px solid rgba(57, 255, 20, 0.4);
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
+    white-space: nowrap;
+}
+
+@keyframes codematch-pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; text-shadow: 0 0 20px #39ff14; }
+}
+
+/* Isolated Status Classes */
+.codematch-status-overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(15px);
+}
+
+.codematch-status-card {
+    padding: 5vmin 8vmin;
+    border: 2px solid;
+    border-radius: 4px;
+    background: rgba(10, 10, 12, 0.95);
+    text-align: center;
+    min-width: 45vmin;
+}
+
+.codematch-status-card.won {
+    border-color: #39ff14;
+    box-shadow: 0 0 50px rgba(57, 255, 20, 0.3);
+    color: #39ff14;
+}
+
+.codematch-status-card.lost {
+    border-color: #ff0066;
+    box-shadow: 0 0 50px rgba(255, 0, 102, 0.3);
+    color: #ff0066;
+}
+
+.codematch-status-card h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 4vmin;
+    margin: 0 0 2vmin 0;
+    letter-spacing: 0.8vmin;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.status-neural-bar {
+    width: 35vmin;
+    height: 0.8vmin;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 1vmin;
+    overflow: hidden;
+    position: relative;
+}
+
+.codematch-status-card.won .neural-fill { background: #39ff14; box-shadow: 0 0 10px #39ff14; }
+.codematch-status-card.lost .neural-fill { background: #ff0066; box-shadow: 0 0 10px #ff0066; }
+
+.neural-fill {
+    height: 100%;
+    width: 0;
+}
