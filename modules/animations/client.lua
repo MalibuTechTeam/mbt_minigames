@@ -12,7 +12,7 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
 
     SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true)
 
-    Utils.MbtDebugger("RunSequence: Pre-loading assets...")
+    Utils.mbtDebugger("RunSequence: Pre-loading assets...")
     for _, pDef in ipairs(finalAnimData.PreProps or {}) do Utils.LoadModel(pDef.Model) end
     for _, pDef in ipairs(finalAnimData.Props or {}) do Utils.LoadModel(pDef.Model) end
 
@@ -35,16 +35,16 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
                     SetEntityAsMissionEntity(pObj, true, true)
                     AttachEntityToEntity(pObj, ped, boneIndex, offset.x, offset.y, offset.z, rot.x, rot.y, rot.z,
                         false, false, false, false, 2, true)
-                    Utils.MbtDebugger("RunSequence: Attached PreProp " ..
+                    Utils.mbtDebugger("RunSequence: Attached PreProp " ..
                         tostring(pDef.Model) .. " to bone " .. tostring(boneIndex))
                 end
             end
 
 
-            Utils.MbtDebugger("RunSequence: Playing PreEnter -> " .. tostring(finalAnimData.PreEnter))
+            Utils.mbtDebugger("RunSequence: Playing PreEnter -> " .. tostring(finalAnimData.PreEnter))
             TaskPlayAnim(ped, preDict, finalAnimData.PreEnter, 16.0, -4.0, -1, finalAnimData.PreEnterFlag or 0, 0, false,
                 false, false)
-            Utils.MbtDebugger("RunSequence: Waiting PreEnterTime (" ..
+            Utils.mbtDebugger("RunSequence: Waiting PreEnterTime (" ..
                 tostring(finalAnimData.PreEnterTime or 1500) .. "ms)")
             Citizen.Wait(finalAnimData.PreEnterTime or 1500)
         end
@@ -53,13 +53,13 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
     if finalAnimData.Enter then
         TaskPlayAnim(ped, animDict, finalAnimData.Enter, 8.0, -8.0, -1, finalAnimData.EnterFlag or 0, 0, false, false,
             false)
-        Utils.MbtDebugger("RunSequence: Waiting EnterPropDelay (" ..
+        Utils.mbtDebugger("RunSequence: Waiting EnterPropDelay (" ..
             tostring(finalAnimData.EnterPropDelay or 150) .. "ms)")
         Citizen.Wait(finalAnimData.EnterPropDelay or 150)
     elseif finalAnimData.Loop then
         TaskPlayAnim(ped, animDict, finalAnimData.Loop, 8.0, -8.0, -1, finalAnimData.LoopFlag or 1, 0, false, false,
             false)
-        Utils.MbtDebugger("RunSequence: Waiting EnterPropDelay (" ..
+        Utils.mbtDebugger("RunSequence: Waiting EnterPropDelay (" ..
             tostring(finalAnimData.EnterPropDelay or 150) .. "ms)")
         Citizen.Wait(finalAnimData.EnterPropDelay or 150)
     end
@@ -67,7 +67,7 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
     local currentCoords = GetEntityCoords(ped)
     for propIndex, pDef in ipairs(finalAnimData.Props or {}) do
         local mHash = GetHashKey(pDef.Model)
-        Utils.MbtDebugger("RunSequence: Spawning Prop " .. tostring(pDef.Model) .. " (Hash: " .. tostring(mHash) .. ")")
+        Utils.mbtDebugger("RunSequence: Spawning Prop " .. tostring(pDef.Model) .. " (Hash: " .. tostring(mHash) .. ")")
 
         local pObj = CreateObject(mHash, currentCoords.x, currentCoords.y, currentCoords.z, true, true, true)
         SetModelAsNoLongerNeeded(mHash)
@@ -83,7 +83,7 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
                 false, false, false, false, 2, true)
 
             local attached = IsEntityAttachedToEntity(pObj, ped)
-            Utils.MbtDebugger("RunSequence: Prop " ..
+            Utils.mbtDebugger("RunSequence: Prop " ..
                 tostring(pDef.Model) ..
                 " attached? " .. tostring(attached) .. " handle: " .. tostring(pObj) .. " at Rot " .. tostring(rot))
         end
@@ -114,11 +114,11 @@ function Animations.RunSequence(finalAnimData, ped, pedCoords, sceneProps, scene
                                 lastPulse = GetGameTimer()
                             })
                     else
-                        Utils.MbtDebugger("^1RunSequence: PTFX handle invalid for " .. tostring(fx.Name) .. "^7")
+                        Utils.mbtWarn("RunSequence: PTFX handle invalid for", fx.Name)
                         RemoveNamedPtfxAsset(fx.Asset)
                     end
                 else
-                    Utils.MbtDebugger("^1RunSequence: PTFX asset load timeout for " .. tostring(fx.Asset) .. "^7")
+                    Utils.mbtWarn("RunSequence: PTFX asset load timeout for", fx.Asset)
                 end
             end
         end

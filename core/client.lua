@@ -97,7 +97,7 @@ local function startHackingSession(data)
     local extraParams = data.params or data.Params or {}
     for k, v in pairs(extraParams) do finalParams[k] = v end
 
-    Utils.MbtDebugger("Starting Hacking Session | Diff: " .. diff .. " | Time: " .. timeLimit)
+    Utils.mbtDebugger("Starting Hacking Session | Diff: " .. diff .. " | Time: " .. timeLimit)
 
     SendNUIMessage({
         Action = "handleUI",
@@ -120,7 +120,7 @@ local function startHackingSession(data)
     end
 
     if sState.Response == nil then
-        Utils.MbtDebugger("^1Hacking session timed out! Forcing cleanup.^7")
+        Utils.mbtWarn("Hacking session timed out! Forcing cleanup.")
         SetNuiFocus(false, false)
         SendNUIMessage({ Action = "handleUI", Status = false, Payload = {} })
         NetworkStopSynchronisedScene(netScene)
@@ -240,7 +240,7 @@ local function startRepairSession(data)
     local extraParams = data.params or data.Params or {}
     for k, v in pairs(extraParams) do finalParams[k] = v end
 
-    Utils.MbtDebugger("Starting Repair Session | Type: " .. gameType .. " | Diff: " .. diff .. " | Time: " .. time)
+    Utils.mbtDebugger("Starting Repair Session | Type: " .. gameType .. " | Diff: " .. diff .. " | Time: " .. time)
 
     SendNUIMessage({
         Action = "handleUI",
@@ -264,7 +264,7 @@ local function startRepairSession(data)
     end
 
     if sState.Response == nil then
-        Utils.MbtDebugger("^1Repair session timed out! Forcing cleanup.^7")
+        Utils.mbtWarn("Repair session timed out! Forcing cleanup.")
         if finalAnimData.Type == "Sequence" then
             Animations.StopSequence(finalAnimData, ped, sceneProps, sceneFx, Utils)
         else
@@ -304,7 +304,7 @@ end
 RegisterNUICallback("minigameEnd", function(data, cb)
     SetNuiFocus(false, false)
     if type(data.sessionId) ~= "string" or type(data.outcome) ~= "boolean" then
-        Utils.MbtDebugger("^1NUI minigameEnd received invalid data — sessionId or outcome malformed^7")
+        Utils.mbtError("NUI minigameEnd received invalid data — sessionId or outcome malformed")
         cb("invalid")
         return
     end
