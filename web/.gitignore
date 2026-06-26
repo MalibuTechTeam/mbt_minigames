@@ -6,11 +6,19 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+bun-debug.log*
 
 node_modules
 dist
 dist-ssr
 *.local
+
+# Foreign lockfiles — this repo uses Bun (bun.lock IS tracked).
+# If someone accidentally runs npm/pnpm install we don't want
+# their lockfile churning the diff.
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
 
 # Editor directories and files
 .vscode/*
