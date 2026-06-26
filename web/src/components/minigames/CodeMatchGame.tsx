@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useMinigameStore } from "../../store/useMinigameStore";
 import { fetchNui } from "../../utils/fetchNui";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,10 +16,19 @@ interface StreamItem {
 
 const CodeMatchGame: React.FC = () => {
   const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
-    useMinigameStore();
-  const codeLocale = locale || {};
+    useMinigameStore(
+      useShallow((s) => ({
+        timeLimit: s.timeLimit,
+        sessionId: s.sessionId,
+        closeGame: s.closeGame,
+        gameParams: s.gameParams,
+        locale: s.locale,
+        debug: s.debug,
+      })),
+    );
+  const codeLocale = useMemo(() => locale || {}, [locale]);
 
-  const initialTimeLimit = useRef(timeLimit || 30).current;
+  const [initialTimeLimit] = useState(() => timeLimit || 30);
   const [timeLeft, setTimeLeft] = useState(initialTimeLimit);
 
   const [stream, setStream] = useState<StreamItem[]>([]);
@@ -39,6 +49,10 @@ const CodeMatchGame: React.FC = () => {
   const mistakesRef = useRef(0);
   const hasEndedRef = useRef(false);
   const currentTargetIndexRef = useRef(0);
+  // Mirror state into refs so the rAF loop reads live values without
+  // restarting (and re-capturing a stale closure) on every change.
+  const targetsRef = useRef<StreamItem[]>([]);
+  const triggerMistakeRef = useRef<() => void>(() => {});
 
   // Difficulty parameters
   const segmentCount = gameParams.segmentCount || 5;
@@ -75,29 +89,20 @@ const CodeMatchGame: React.FC = () => {
     };
   }, []);
 
-  const generateRandomCode = () => {
-    let code = "";
-    for (let i = 0; i < 4; i++) {
-      code += CHARS[Math.floor(Math.random() * CHARS.length)];
-    }
-    return code;
-  };
-
-  const generateStreamItem = (forcedCode?: string): StreamItem => {
-    globalIdCounter.current++;
-    const code = forcedCode || generateRandomCode();
-    const address = `0x${globalIdCounter.current.toString(16).padStart(4, "0").toUpperCase()}`;
-    return {
-      id: `item-${globalIdCounter.current}`,
-      code,
-      address,
-    };
-  };
-
   useEffect(() => {
     if (didInit.current) return;
     didInit.current = true;
     globalIdCounter.current = 0;
+
+    const generateStreamItem = (): StreamItem => {
+      globalIdCounter.current++;
+      let code = "";
+      for (let i = 0; i < 4; i++) {
+        code += CHARS[Math.floor(Math.random() * CHARS.length)];
+      }
+      const address = `0x${globalIdCounter.current.toString(16).padStart(4, "0").toUpperCase()}`;
+      return { id: `item-${globalIdCounter.current}`, code, address };
+    };
 
     const streamSize = Math.ceil(initialTimeLimit * SPEED_ITEMS_PER_SEC) + 5;
     const newStream = Array.from({ length: streamSize }, () =>
@@ -121,6 +126,7 @@ const CodeMatchGame: React.FC = () => {
 
     setStream(newStream);
     setTargets(newTargets);
+    targetsRef.current = newTargets;
   }, [
     initialTimeLimit,
     SPEED_ITEMS_PER_SEC,
@@ -144,11 +150,12 @@ const CodeMatchGame: React.FC = () => {
         containerRef.current.style.transform = `translateY(${currentY}vh)`;
       }
 
+      const liveTargets = targetsRef.current;
       if (
-        targets.length > 0 &&
-        currentTargetIndexRef.current < targets.length
+        liveTargets.length > 0 &&
+        currentTargetIndexRef.current < liveTargets.length
       ) {
-        const currentTarget = targets[currentTargetIndexRef.current];
+        const currentTarget = liveTargets[currentTargetIndexRef.current];
         const targetEl = document.getElementById(currentTarget.id);
         const scanner = document.getElementById("scanner-bracket");
 
@@ -161,7 +168,7 @@ const CodeMatchGame: React.FC = () => {
             !missedRef.current[currentTargetIndexRef.current]
           ) {
             missedRef.current[currentTargetIndexRef.current] = true;
-            triggerMistake();
+            triggerMistakeRef.current();
           }
         }
       }
@@ -230,6 +237,11 @@ const CodeMatchGame: React.FC = () => {
     }
   }, [maxMistakes, handleEnd]);
 
+  // Keep the rAF-facing ref pointed at the latest triggerMistake.
+  useEffect(() => {
+    triggerMistakeRef.current = triggerMistake;
+  }, [triggerMistake]);
+
   const handleAction = useCallback(() => {
     if (status !== "playing" || targets.length === 0) return;
 
@@ -280,9 +292,9 @@ const CodeMatchGame: React.FC = () => {
     targets,
     currentTargetIndex,
     score,
-    mistakes,
     segmentCount,
-    maxMistakes,
+    handleEnd,
+    triggerMistake,
   ]);
 
   useEffect(() => {

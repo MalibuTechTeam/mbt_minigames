@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useMinigameStore } from "../../store/useMinigameStore";
 import { fetchNui } from "../../utils/fetchNui";
 import { motion, AnimatePresence } from "framer-motion";
@@ -85,22 +86,169 @@ const computePowerState = (
   return { newGrid: nextGrid, reachedEnd };
 };
 
+// Build the randomized, solvable board once. Pure (apart from Math.random),
+// so it runs in a lazy useState initializer rather than a cascading effect.
+const buildInitialBoard = (
+  rows: number,
+  cols: number,
+): { grid: GridTile[][]; startRow: number; endRow: number } => {
+  const newGrid: GridTile[][] = Array.from({ length: rows }, (_, r) =>
+    Array.from({ length: cols }, (_, c) => ({
+      id: `${r}-${c}`,
+      row: r,
+      col: c,
+      type: "EMPTY",
+      rotation: 0,
+      powered: false,
+      isStartNode: false,
+      isEndNode: false,
+    })),
+  );
+
+  const sRow = Math.floor(Math.random() * rows);
+  let eRow = Math.floor(Math.random() * rows);
+  if (rows > 1 && eRow === sRow) eRow = (sRow + 1) % rows;
+
+  let currentRow = sRow;
+  let currentCol = 0;
+
+  const pathCoords: { r: number; c: number }[] = [
+    { r: currentRow, c: currentCol },
+  ];
+
+  while (currentCol < cols - 1 || currentRow !== eRow) {
+    let moveDir: "RIGHT" | "VERT" = "RIGHT";
+    if (currentCol === cols - 1) {
+      moveDir = "VERT";
+    } else if (currentRow !== eRow && Math.random() > 0.5) {
+      moveDir = "VERT";
+    }
+
+    if (moveDir === "RIGHT") {
+      currentCol++;
+    } else {
+      if (currentRow < eRow) currentRow++;
+      else currentRow--;
+    }
+    pathCoords.push({ r: currentRow, c: currentCol });
+  }
+
+  for (let i = 0; i < pathCoords.length; i++) {
+    const current = pathCoords[i];
+    const prev =
+      i > 0 ? pathCoords[i - 1] : { r: current.r, c: current.c - 1 };
+    const next =
+      i < pathCoords.length - 1
+        ? pathCoords[i + 1]
+        : { r: current.r, c: current.c + 1 };
+
+    let entryDir = -1;
+    if (prev.r < current.r) entryDir = 0;
+    else if (prev.c > current.c) entryDir = 1;
+    else if (prev.r > current.r) entryDir = 2;
+    else if (prev.c < current.c) entryDir = 3;
+
+    let exitDir = -1;
+    if (next.r < current.r) exitDir = 0;
+    else if (next.c > current.c) exitDir = 1;
+    else if (next.r > current.r) exitDir = 2;
+    else if (next.c < current.c) exitDir = 3;
+
+    let reqType: TileDef["type"] = "STRAIGHT";
+
+    if (
+      (entryDir === 1 && exitDir === 3) ||
+      (entryDir === 3 && exitDir === 1) ||
+      (entryDir === 0 && exitDir === 2) ||
+      (entryDir === 2 && exitDir === 0)
+    ) {
+      reqType = "STRAIGHT";
+    } else {
+      reqType = "CORNER";
+    }
+
+    if (Math.random() > 0.7) {
+      reqType = Math.random() > 0.5 ? "T_SHAPE" : "CROSS";
+    }
+
+    newGrid[current.r][current.c].type = reqType;
+  }
+
+  const tileTypes: TileDef["type"][] = ["STRAIGHT", "CORNER", "T_SHAPE"];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (newGrid[r][c].type === "EMPTY") {
+        const randomType =
+          tileTypes[Math.floor(Math.random() * tileTypes.length)];
+        newGrid[r][c].type = randomType;
+      }
+      newGrid[r][c].rotation = Math.floor(Math.random() * 4);
+    }
+  }
+
+  const startTile = newGrid[sRow][0];
+  const startDef = TILE_DICTIONARY[startTile.type];
+  for (let rot = 0; rot < 4; rot++) {
+    const connections = getRotatedConnections(startDef.connections, rot);
+    if (connections[3]) {
+      startTile.rotation = rot;
+      break;
+    }
+  }
+
+  const endTile = newGrid[eRow][cols - 1];
+  const endDef = TILE_DICTIONARY[endTile.type];
+  const secondToLast = pathCoords[pathCoords.length - 2];
+  const lastCoord = pathCoords[pathCoords.length - 1];
+  let endIncomingDir = 3;
+  if (secondToLast.r < lastCoord.r) endIncomingDir = 0;
+  else if (secondToLast.r > lastCoord.r) endIncomingDir = 2;
+  for (let rot = 0; rot < 4; rot++) {
+    const connections = getRotatedConnections(endDef.connections, rot);
+    if (connections[endIncomingDir] && connections[1]) {
+      endTile.rotation = rot;
+      break;
+    }
+  }
+
+  const { newGrid: poweredGrid } = computePowerState(
+    newGrid,
+    sRow,
+    eRow,
+    rows,
+    cols,
+  );
+
+  return { grid: poweredGrid, startRow: sRow, endRow: eRow };
+};
+
 const WireFixGame: React.FC = () => {
   const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
-    useMinigameStore();
-  const wireLocale = locale || {};
+    useMinigameStore(
+      useShallow((s) => ({
+        timeLimit: s.timeLimit,
+        sessionId: s.sessionId,
+        closeGame: s.closeGame,
+        gameParams: s.gameParams,
+        locale: s.locale,
+        debug: s.debug,
+      })),
+    );
+  const wireLocale = useMemo(() => locale || {}, [locale]);
 
   const cols = gameParams.wireCount ? Math.max(4, gameParams.wireCount + 1) : 5;
   const rows = Math.min(cols - 1, 5);
-  const initialTimeLimit = useRef(
-    gameParams.timeLimit || timeLimit || 45,
-  ).current;
+  const [initialTimeLimit] = useState(
+    () => gameParams.timeLimit || timeLimit || 45,
+  );
 
   const [timeLeft, setTimeLeft] = useState(initialTimeLimit);
-  const [grid, setGrid] = useState<GridTile[][]>([]);
+  // Board (grid + source/sink rows) is generated once from rows/cols.
+  const [board] = useState(() => buildInitialBoard(rows, cols));
+  const [grid, setGrid] = useState<GridTile[][]>(board.grid);
   const [status, setStatus] = useState<"playing" | "won" | "lost">("playing");
-  const [startRow, setStartRow] = useState(0);
-  const [endRow, setEndRow] = useState(0);
+  const startRow = board.startRow;
+  const endRow = board.endRow;
 
   const hasEndedRef = useRef(false);
 
@@ -119,152 +267,6 @@ const WireFixGame: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    let newGrid: GridTile[][] = Array.from({ length: rows }, (_, r) =>
-      Array.from({ length: cols }, (_, c) => ({
-        id: `${r}-${c}`,
-        row: r,
-        col: c,
-        type: "EMPTY",
-        rotation: 0,
-        powered: false,
-        isStartNode: false,
-        isEndNode: false,
-      })),
-    );
-
-    const sRow = Math.floor(Math.random() * rows);
-    let eRow = Math.floor(Math.random() * rows);
-    if (rows > 1 && eRow === sRow) eRow = (sRow + 1) % rows;
-    setStartRow(sRow);
-    setEndRow(eRow);
-
-    let currentRow = sRow;
-    let currentCol = 0;
-
-    const pathCoords: { r: number; c: number }[] = [
-      { r: currentRow, c: currentCol },
-    ];
-
-    while (currentCol < cols - 1 || currentRow !== eRow) {
-      let moveDir: "RIGHT" | "VERT" = "RIGHT";
-      if (currentCol === cols - 1) {
-        moveDir = "VERT";
-      } else if (currentRow !== eRow && Math.random() > 0.5) {
-        moveDir = "VERT";
-      }
-
-      if (moveDir === "RIGHT") {
-        currentCol++;
-      } else {
-        if (currentRow < eRow) currentRow++;
-        else currentRow--;
-      }
-      pathCoords.push({ r: currentRow, c: currentCol });
-    }
-
-    for (let i = 0; i < pathCoords.length; i++) {
-      const current = pathCoords[i];
-      const prev =
-        i > 0 ? pathCoords[i - 1] : { r: current.r, c: current.c - 1 };
-      const next =
-        i < pathCoords.length - 1
-          ? pathCoords[i + 1]
-          : { r: current.r, c: current.c + 1 };
-
-      let entryDir = -1;
-      if (prev.r < current.r) entryDir = 0;
-      else if (prev.c > current.c) entryDir = 1;
-      else if (prev.r > current.r) entryDir = 2;
-      else if (prev.c < current.c) entryDir = 3;
-
-      let exitDir = -1;
-      if (next.r < current.r) exitDir = 0;
-      else if (next.c > current.c) exitDir = 1;
-      else if (next.r > current.r) exitDir = 2;
-      else if (next.c < current.c) exitDir = 3;
-
-      let reqType: TileDef["type"] = "STRAIGHT";
-
-      if (
-        (entryDir === 1 && exitDir === 3) ||
-        (entryDir === 3 && exitDir === 1) ||
-        (entryDir === 0 && exitDir === 2) ||
-        (entryDir === 2 && exitDir === 0)
-      ) {
-        reqType = "STRAIGHT";
-      } else {
-        reqType = "CORNER";
-      }
-
-      if (Math.random() > 0.7) {
-        reqType = Math.random() > 0.5 ? "T_SHAPE" : "CROSS";
-      }
-
-      newGrid[current.r][current.c].type = reqType;
-    }
-
-    const tileTypes: TileDef["type"][] = ["STRAIGHT", "CORNER", "T_SHAPE"];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (newGrid[r][c].type === "EMPTY") {
-          const randomType =
-            tileTypes[Math.floor(Math.random() * tileTypes.length)];
-          newGrid[r][c].type = randomType;
-        }
-        newGrid[r][c].rotation = Math.floor(Math.random() * 4);
-      }
-    }
-
-    const startTile = newGrid[sRow][0];
-    const startDef = TILE_DICTIONARY[startTile.type];
-    for (let rot = 0; rot < 4; rot++) {
-      const connections = getRotatedConnections(startDef.connections, rot);
-      if (connections[3]) {
-        startTile.rotation = rot;
-        break;
-      }
-    }
-
-    const endTile = newGrid[eRow][cols - 1];
-    const endDef = TILE_DICTIONARY[endTile.type];
-    const secondToLast = pathCoords[pathCoords.length - 2];
-    const lastCoord = pathCoords[pathCoords.length - 1];
-    let endIncomingDir = 3;
-    if (secondToLast.r < lastCoord.r) endIncomingDir = 0;
-    else if (secondToLast.r > lastCoord.r) endIncomingDir = 2;
-    for (let rot = 0; rot < 4; rot++) {
-      const connections = getRotatedConnections(endDef.connections, rot);
-      if (connections[endIncomingDir] && connections[1]) {
-        endTile.rotation = rot;
-        break;
-      }
-    }
-
-    const { newGrid: poweredGrid } = computePowerState(
-      newGrid,
-      sRow,
-      eRow,
-      rows,
-      cols,
-    );
-    setGrid(poweredGrid);
-  }, [rows, cols]);
-
-  useEffect(() => {
-    if (status !== "playing") return;
-    const interval = setInterval(() => {
-      setTimeLeft((prev: number) => {
-        if (prev <= 1) {
-          handleEnd(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [status]);
-
   const handleEnd = useCallback(
     (win: boolean) => {
       if (hasEndedRef.current) return;
@@ -280,6 +282,20 @@ const WireFixGame: React.FC = () => {
     },
     [sessionId, closeGame],
   );
+
+  useEffect(() => {
+    if (status !== "playing") return;
+    const interval = setInterval(() => {
+      setTimeLeft((prev: number) => {
+        if (prev <= 1) {
+          handleEnd(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [status, handleEnd]);
 
   const handleTileClick = (r: number, c: number) => {
     if (status !== "playing") return;

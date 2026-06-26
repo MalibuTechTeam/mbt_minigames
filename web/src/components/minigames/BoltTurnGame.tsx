@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useMinigameStore } from "../../store/useMinigameStore";
 import { fetchNui } from "../../utils/fetchNui";
 import { motion, AnimatePresence } from "framer-motion";
@@ -56,11 +57,20 @@ const CurvedGauge: React.FC<{ value: number; label: string }> = ({
 
 const BoltTurnGame: React.FC = () => {
   const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
-    useMinigameStore();
-  const boltLocale = locale || {};
-  const initialTimeLimit = useRef(
-    gameParams.timeLimit || timeLimit || 45,
-  ).current;
+    useMinigameStore(
+      useShallow((s) => ({
+        timeLimit: s.timeLimit,
+        sessionId: s.sessionId,
+        closeGame: s.closeGame,
+        gameParams: s.gameParams,
+        locale: s.locale,
+        debug: s.debug,
+      })),
+    );
+  const boltLocale = useMemo(() => locale || {}, [locale]);
+  const [initialTimeLimit] = useState(
+    () => gameParams.timeLimit || timeLimit || 45,
+  );
   const [timeLeft, setTimeLeft] = useState(initialTimeLimit);
 
   // Difficulty parameters
@@ -114,6 +124,28 @@ const BoltTurnGame: React.FC = () => {
     };
   }, []);
 
+  const handleEnd = useCallback(
+    (win: boolean) => {
+      if (hasEndedRef.current) return;
+      hasEndedRef.current = true;
+      setStatus(win ? "won" : "lost");
+
+      if (turnSound.current) {
+        turnSound.current.pause();
+        turnSound.current.currentTime = 0;
+      }
+
+      if (win) {
+        successSound.current?.play().catch(() => {});
+      } else {
+        failedSound.current?.play().catch(() => {});
+      }
+      fetchNui("minigameEnd", { outcome: win, sessionId });
+      setTimeout(closeGame, 2500);
+    },
+    [sessionId, closeGame],
+  );
+
   useEffect(() => {
     if (status !== "playing") return;
     const timerInterval = setInterval(() => {
@@ -126,26 +158,7 @@ const BoltTurnGame: React.FC = () => {
       });
     }, 1000);
     return () => clearInterval(timerInterval);
-  }, [status]);
-
-  const handleEnd = (win: boolean) => {
-    if (hasEndedRef.current) return;
-    hasEndedRef.current = true;
-    setStatus(win ? "won" : "lost");
-
-    if (turnSound.current) {
-      turnSound.current.pause();
-      turnSound.current.currentTime = 0;
-    }
-
-    if (win) {
-      successSound.current?.play().catch(() => {});
-    } else {
-      failedSound.current?.play().catch(() => {});
-    }
-    fetchNui("minigameEnd", { outcome: win, sessionId });
-    setTimeout(closeGame, 2500);
-  };
+  }, [status, handleEnd]);
 
   const triggerOverheat = useCallback(
     (index: number) => {
@@ -168,10 +181,12 @@ const BoltTurnGame: React.FC = () => {
         handleEnd(false);
       }
 
+      const overheatStamp = new Date().toLocaleTimeString();
       setErrorLog((prevLogs) => [
-        (
-          boltLocale.log_overheat || "TORQUE OVERLOAD: BOLT #%s STRIPPED"
-        ).replace("%s", (index + 1).toString()),
+        `[${overheatStamp}] ${(
+          (boltLocale.log_overheat as string) ||
+          "TORQUE OVERLOAD: BOLT #%s STRIPPED"
+        ).replace("%s", (index + 1).toString())}`,
         ...prevLogs.slice(0, 4),
       ]);
 
@@ -202,15 +217,17 @@ const BoltTurnGame: React.FC = () => {
           restored[index] = false;
           return restored;
         });
+        const restoredStamp = new Date().toLocaleTimeString();
         setErrorLog((prevLogs) => [
-          (
-            boltLocale.log_restored || "THREADS SECURED: BOLT #%s READY"
-          ).replace("%s", (index + 1).toString()),
+          `[${restoredStamp}] ${(
+            (boltLocale.log_restored as string) ||
+            "THREADS SECURED: BOLT #%s READY"
+          ).replace("%s", (index + 1).toString())}`,
           ...prevLogs.slice(0, 4),
         ]);
       }, OVERHEAT_PENALTY_MS);
     },
-    [maxErrors, boltLocale, status],
+    [maxErrors, boltLocale, status, handleEnd],
   );
 
   useEffect(() => {
@@ -297,6 +314,9 @@ const BoltTurnGame: React.FC = () => {
 
     return () => {
       if (reqRef.current) cancelAnimationFrame(reqRef.current);
+      // Reset the delta clock so the next loop (e.g. after activeValve
+      // changes) doesn't compute a huge first-frame deltaTime spike.
+      lastTimeRef.current = undefined;
     };
   }, [status, activeValve, boltCount, heatSpeed, triggerOverheat]);
 
@@ -428,7 +448,7 @@ const BoltTurnGame: React.FC = () => {
                     (boltCount * 100)) *
                   100
                 }
-                label={boltLocale.neural_load || "COMPLETION"}
+                label={(boltLocale.neural_load as string) || "COMPLETION"}
               />
 
               <div className="indicator-group" style={{ marginTop: "2vmin" }}>
@@ -645,7 +665,7 @@ const BoltTurnGame: React.FC = () => {
                           color: log.includes("STRIPPED") ? "#ff3366" : "#888",
                         }}
                       >
-                        [{new Date().toLocaleTimeString()}] {log}
+                        {log}
                       </motion.div>
                     ))}
                   </AnimatePresence>

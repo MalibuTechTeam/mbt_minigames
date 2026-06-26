@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useMinigameStore } from "./store/useMinigameStore";
-import type { MinigameType } from "./store/useMinigameStore";
+import type { MinigameType, GameParams, Locale } from "./store/useMinigameStore";
 
 const VALID_GAME_TYPES: MinigameType[] = ["hacking", "wire_fix", "bolt_turn", "code_match"];
 import { AnimatePresence, motion } from "framer-motion";
@@ -10,16 +11,36 @@ import BoltTurnGame from "./components/minigames/BoltTurnGame";
 import CodeMatchGame from "./components/minigames/CodeMatchGame";
 import "./App.css";
 
+interface NuiMessage {
+  Action?: string;
+  Status?: boolean;
+  Payload?: {
+    Type?: string;
+    Id: string;
+    TimeLimit: number;
+    Params?: GameParams;
+    Locale?: Locale;
+    Debug?: boolean;
+  };
+}
+
 const App: React.FC = () => {
-  const { show, gameType, openGame, closeGame } = useMinigameStore();
+  const { show, gameType, openGame, closeGame } = useMinigameStore(
+    useShallow((s) => ({
+      show: s.show,
+      gameType: s.gameType,
+      openGame: s.openGame,
+      closeGame: s.closeGame,
+    })),
+  );
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = (event: MessageEvent<NuiMessage>) => {
       const data = event.data;
       if (data.Action === "handleUI") {
-        if (data.Status) {
-          const raw = data.Payload.Type as string;
-          const type = VALID_GAME_TYPES.includes(raw as MinigameType) ? (raw as MinigameType) : null;
+        if (data.Status && data.Payload) {
+          const raw = data.Payload.Type;
+          const type = raw && VALID_GAME_TYPES.includes(raw as MinigameType) ? (raw as MinigameType) : null;
           if (!type) return;
           openGame(
             type,

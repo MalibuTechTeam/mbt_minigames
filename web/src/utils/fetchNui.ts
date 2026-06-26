@@ -1,8 +1,14 @@
 import { useMinigameStore } from "../store/useMinigameStore";
 
-export const fetchNui = async (eventName: string, data: any = {}): Promise<any> => {
-  const resourceName = (window as any).GetParentResourceName
-    ? (window as any).GetParentResourceName()
+type ParentWindow = Window & { GetParentResourceName?: () => string };
+
+export const fetchNui = async (
+  eventName: string,
+  data: Record<string, unknown> = {},
+): Promise<unknown> => {
+  const parent = window as ParentWindow;
+  const resourceName = parent.GetParentResourceName
+    ? parent.GetParentResourceName()
     : 'mbt_minigames';
 
   try {

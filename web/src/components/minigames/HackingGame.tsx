@@ -1,18 +1,27 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useMinigameStore } from "../../store/useMinigameStore";
+import type { Locale } from "../../store/useMinigameStore";
 import { fetchNui } from "../../utils/fetchNui";
 import { motion, AnimatePresence } from "framer-motion";
 import LaptopFrame from "./LaptopFrame";
 import "./HackingGame.css";
 
+const HEX = "0123456789ABCDEF";
+const genHexPair = () =>
+  HEX[Math.floor(Math.random() * 16)] + HEX[Math.floor(Math.random() * 16)];
+const buildGrid = () => Array.from({ length: 64 }, genHexPair);
+const buildWanted = (grid: string[], length: number) =>
+  Array.from({ length }, () => grid[Math.floor(Math.random() * 64)]);
+
 const BootSequence: React.FC<{
   onComplete: () => void;
-  hackingLocale: any;
+  hackingLocale: Locale;
 }> = ({ onComplete, hackingLocale }) => {
   const [lines, setLines] = useState<string[]>([]);
 
   useEffect(() => {
-    const bootLines = hackingLocale.boot_lines || [
+    const bootLines = (hackingLocale.boot_lines as string[]) || [
       "[ KERNEL ] LOADING NEURAL MODULES...",
       "[ MEMORY ] INTEG_CHECK: 0x5F3A... PASS",
       "[ NET ] BYPASSING FIREWALL (PORT 8080)...",
@@ -63,19 +72,31 @@ const BootSequence: React.FC<{
 
 const HackingGame: React.FC = () => {
   const { timeLimit, sessionId, closeGame, gameParams, locale, debug } =
-    useMinigameStore();
-  const hackingLocale = locale || {};
+    useMinigameStore(
+      useShallow((s) => ({
+        timeLimit: s.timeLimit,
+        sessionId: s.sessionId,
+        closeGame: s.closeGame,
+        gameParams: s.gameParams,
+        locale: s.locale,
+        debug: s.debug,
+      })),
+    );
+  const hackingLocale = useMemo(() => locale || {}, [locale]);
+  const maxMistakes = gameParams.maxMistakes || 4;
+  const sequenceLength = gameParams.sequenceLength || 5;
   const [timeLeft, setTimeLeft] = useState(timeLimit || 35);
-  const [gridItems, setGridItems] = useState<string[]>([]);
-  const [wantedItems, setWantedItems] = useState<string[]>([]);
+  // Grid + target sequence are derived once from props — lazy-init, no effect.
+  const [gridItems] = useState<string[]>(buildGrid);
+  const [wantedItems] = useState<string[]>(() =>
+    buildWanted(gridItems, sequenceLength),
+  );
   const [foundItems, setFoundItems] = useState<string[]>([]);
   const [isBooting, setIsBooting] = useState(true);
   const [status, setStatus] = useState<"playing" | "won" | "lost">("playing");
   const [wrongIndex, setWrongIndex] = useState<number | null>(null);
   const [mistakes, setMistakes] = useState(0);
-  const maxMistakes = gameParams.maxMistakes || 4;
-  const sequenceLength = gameParams.sequenceLength || 5;
-  const [displaySessionId] = useState(
+  const [displaySessionId] = useState(() =>
     Math.random().toString(36).substring(7).toUpperCase(),
   );
 
@@ -86,6 +107,23 @@ const HackingGame: React.FC = () => {
   const errorSound = useRef<HTMLAudioElement | null>(null);
   const winSound = useRef<HTMLAudioElement | null>(null);
   const loseSound = useRef<HTMLAudioElement | null>(null);
+
+  const handleEnd = useCallback(
+    (success: boolean) => {
+      if (hasEndedRef.current) return;
+      hasEndedRef.current = true;
+      setStatus(success ? "won" : "lost");
+      fetchNui("minigameEnd", { outcome: success, sessionId });
+      if (success) {
+        winSound.current?.play().catch(() => {});
+        setTimeout(closeGame, 2000);
+      } else {
+        loseSound.current?.play().catch(() => {});
+        setTimeout(closeGame, 3000);
+      }
+    },
+    [sessionId, closeGame],
+  );
 
   useEffect(() => {
     hoverSound.current = new Audio("assets/hover.ogg");
@@ -103,39 +141,26 @@ const HackingGame: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const hex = "0123456789ABCDEF";
-    const generateHex = () =>
-      Array.from({ length: 2 }, () => hex[Math.floor(Math.random() * 16)]).join(
-        "",
-      );
-    const newGrid = Array.from({ length: 64 }, generateHex);
-    const newWanted = Array.from(
-      { length: sequenceLength },
-      () => newGrid[Math.floor(Math.random() * 64)],
-    );
-
-    setGridItems(newGrid);
-    setWantedItems(newWanted);
-    setFoundItems([]);
-    setTimeLeft(timeLimit || 35);
-
     const bootTimer = setTimeout(() => setIsBooting(false), 2000);
     return () => clearTimeout(bootTimer);
-  }, [timeLimit, sequenceLength]);
+  }, []);
 
+  // Tick: one stable interval that lives only while actively playing.
   useEffect(() => {
-    if (
-      status === "playing" &&
-      !isBooting &&
-      timeLeft > 0 &&
-      foundItems.length < wantedItems.length
-    ) {
-      const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-      return () => clearInterval(timer);
-    } else if (timeLeft === 0 && status === "playing") {
+    if (status !== "playing" || isBooting) return;
+    const timer = setInterval(
+      () => setTimeLeft((prev) => Math.max(0, prev - 1)),
+      1000,
+    );
+    return () => clearInterval(timer);
+  }, [status, isBooting]);
+
+  // End the game when the clock reaches zero.
+  useEffect(() => {
+    if (timeLeft === 0 && status === "playing" && !isBooting) {
       handleEnd(false);
     }
-  }, [status, isBooting, timeLeft, foundItems.length, wantedItems.length]);
+  }, [timeLeft, status, isBooting, handleEnd]);
 
   const handleItemClick = (item: string, index: number) => {
     if (status !== "playing" || isBooting) return;
@@ -165,20 +190,6 @@ const HackingGame: React.FC = () => {
       }
 
       setTimeout(() => setWrongIndex(null), 500);
-    }
-  };
-
-  const handleEnd = (success: boolean) => {
-    if (hasEndedRef.current) return;
-    hasEndedRef.current = true;
-    setStatus(success ? "won" : "lost");
-    fetchNui("minigameEnd", { outcome: success, sessionId });
-    if (success) {
-      winSound.current?.play().catch(() => {});
-      setTimeout(closeGame, 2000);
-    } else {
-      loseSound.current?.play().catch(() => {});
-      setTimeout(closeGame, 3000);
     }
   };
 
