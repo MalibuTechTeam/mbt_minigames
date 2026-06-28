@@ -6,6 +6,11 @@ local Debug = loadModule('modules.debug.client')
 local activeSceneProps = {}
 local activeSceneFx = {}
 
+-- Set by the cancelSession export (or detected player death) to abort an
+-- in-progress session early. Declared up here so the session functions below
+-- capture it as an upvalue. Reset per session in runGuarded.
+local sessionCancelled = false
+
 AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
     for _, pObj in ipairs(activeSceneProps) do
@@ -115,11 +120,12 @@ local function startHackingSession(data)
 
     local hackWaitStart = GetGameTimer()
     while sState.Response == nil and (GetGameTimer() - hackWaitStart) < 120000 do
+        if IsEntityDead(ped) or sessionCancelled then break end
         Citizen.Wait(5)
     end
 
     if sState.Response == nil then
-        Utils.mbtWarn("Hacking session timed out! Forcing cleanup.")
+        Utils.mbtWarn("Hacking session ended without result (timeout/death/cancel). Forcing cleanup.")
         SetNuiFocus(false, false)
         SendNUIMessage({ Action = "handleUI", Status = false, Payload = {} })
         NetworkStopSynchronisedScene(netScene)
@@ -261,12 +267,13 @@ local function startRepairSession(data)
 
     local repairWaitStart = GetGameTimer()
     while sState.Response == nil and (GetGameTimer() - repairWaitStart) < 120000 do
+        if IsEntityDead(ped) or sessionCancelled then break end
         Animations.UpdatePtfxPulse(sceneFx)
         Citizen.Wait(100)
     end
 
     if sState.Response == nil then
-        Utils.mbtWarn("Repair session timed out! Forcing cleanup.")
+        Utils.mbtWarn("Repair session ended without result (timeout/death/cancel). Forcing cleanup.")
         if finalAnimData.Type == "Sequence" then
             Animations.StopSequence(finalAnimData, ped, sceneProps, sceneFx, Utils)
         else
@@ -330,6 +337,7 @@ local function runGuarded(fn, data)
         return false
     end
     sessionBusy = true
+    sessionCancelled = false
     local ok, res = pcall(fn, data)
     sessionBusy = false
     if not ok then
@@ -345,6 +353,13 @@ end)
 
 exports('startRepairSession', function(data)
     return runGuarded(startRepairSession, data)
+end)
+
+-- Abort an in-progress session early (e.g. the player walked away or the
+-- consumer needs to interrupt). The session's wait loop picks this up and runs
+-- its normal cleanup, so the export returns false. No-op if nothing is running.
+exports('cancelSession', function()
+    if sessionBusy then sessionCancelled = true end
 end)
 
 

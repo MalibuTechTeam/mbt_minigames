@@ -114,6 +114,19 @@ exports['mbt_minigames']:startRepairSession({
 })
 ```
 
+### Cancelling a session
+
+If you need to abort an in-progress minigame (e.g. the player walked away or
+died), call:
+
+```lua
+exports['mbt_minigames']:cancelSession()
+```
+
+The active session ends, cleans up its animation/props, and its
+`start*Session` call returns `false`. A player dying mid-minigame is detected
+automatically and ends the session the same way. No-op if nothing is running.
+
 ---
 
 ## Configuration
@@ -152,7 +165,7 @@ MBT.Minigames = {
 | Game | Parameters |
 |---|---|
 | `hacking` | `time`, `sequenceLength`, `maxMistakes` |
-| `wire_fix` | `time`, `wireCount`, `shuffleSpeed`, `maxMistakes` |
+| `wire_fix` | `time`, `wireCount` |
 | `bolt_turn` | `time`, `boltCount`, `heatSpeed`, `maxMistakes` |
 | `code_match` | `time`, `segmentCount`, `shiftSpeed`, `maxMistakes` |
 

@@ -80,9 +80,10 @@ MBT.Minigames = {
 			}
 		},
 		difficulties = {
-			Easy   = { time = 45, wireCount = 4, shuffleSpeed = 6000, maxMistakes = 4 },
-			Medium = { time = 55, wireCount = 5, shuffleSpeed = 4000, maxMistakes = 3 },
-			Hard   = { time = 70, wireCount = 6, shuffleSpeed = 2000, maxMistakes = 2 }
+			-- wire_fix is a pure pipe-puzzle: only time + grid size apply.
+			Easy   = { time = 45, wireCount = 4 },
+			Medium = { time = 55, wireCount = 5 },
+			Hard   = { time = 70, wireCount = 6 }
 		}
 	},
 
