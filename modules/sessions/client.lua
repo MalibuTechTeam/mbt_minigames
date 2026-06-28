@@ -1,6 +1,9 @@
 local Sessions = {}
 local activeSessions = {}
 
+-- Seed once so ids aren't an identical sequence across clients each boot.
+math.randomseed(GetGameTimer() + GetPlayerServerId(PlayerId()))
+
 local function generateId()
     local s = ""
     for i = 1, 20 do

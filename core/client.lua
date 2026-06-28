@@ -88,7 +88,6 @@ local function startHackingSession(data)
     -- Difficulty & Parameter Resolution
     local diffRaw = data.difficulty or data.Difficulty or MBT.DefaultDifficulty or "Easy"
     local diff = string.upper(string.sub(diffRaw, 1, 1)) .. string.lower(string.sub(diffRaw, 2))
-    local gameConfig = MBT.Minigames['hacking'] or {}
     local configParams = (gameConfig.difficulties or {})[diff] or {}
     local timeLimit = data.Time or data.time or configParams.time or 30
 
@@ -147,6 +146,9 @@ local function startHackingSession(data)
     SetFollowPedCamViewMode(0)
     FreezeEntityPosition(ped, false)
     Sessions.Cleanup(sessionId)
+
+    if outcome and data.onSuccess then data.onSuccess() end
+    if not outcome and data.onFail then data.onFail() end
 
     return outcome
 end
@@ -309,17 +311,40 @@ RegisterNUICallback("minigameEnd", function(data, cb)
         return
     end
     Sessions.SetResponse(data.sessionId, data.outcome)
-    Wait(2000)
-    SendNUIMessage({ Action = "handleUI", Status = false, Payload = {} })
     cb("ok")
+    -- Let the NUI play its result screen, then ask it to hide. Done off the
+    -- callback thread so we acknowledge the NUI immediately.
+    SetTimeout(2000, function()
+        SendNUIMessage({ Action = "handleUI", Status = false, Payload = {} })
+    end)
 end)
 
+-- Re-entrancy guard: only one session may run at a time. pcall ensures a
+-- runtime error mid-session can't leave the lock stuck (and props are still
+-- swept by the onResourceStop handler).
+local sessionBusy = false
+
+local function runGuarded(fn, data)
+    if sessionBusy then
+        Utils.mbtWarn("A minigame session is already active — ignoring concurrent request")
+        return false
+    end
+    sessionBusy = true
+    local ok, res = pcall(fn, data)
+    sessionBusy = false
+    if not ok then
+        Utils.mbtError("Minigame session error: " .. tostring(res))
+        return false
+    end
+    return res
+end
+
 exports('startHackingSession', function(data)
-    return startHackingSession(data)
+    return runGuarded(startHackingSession, data)
 end)
 
 exports('startRepairSession', function(data)
-    return startRepairSession(data)
+    return runGuarded(startRepairSession, data)
 end)
 
 
