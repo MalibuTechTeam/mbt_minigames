@@ -1,55 +1,15 @@
 local Utils = {}
 
-local _resName = GetCurrentResourceName()
-
-local function _prettyTable(t, indent)
-    indent = indent or 1
-    local pad = string.rep("  ", indent)
-    local lines = {}
-    for k, v in pairs(t) do
-        local key = type(k) == "number" and ("[" .. k .. "]") or tostring(k)
-        if type(v) == "table" then
-            lines[#lines + 1] = pad .. key .. " = " .. _prettyTable(v, indent + 1)
-        else
-            lines[#lines + 1] = pad .. key .. " = " .. tostring(v)
-        end
-    end
-    return "{\n" .. table.concat(lines, ",\n") .. "\n" .. string.rep("  ", indent - 1) .. "}"
-end
-
-local function _serialize(v)
-    if type(v) == "table" then return _prettyTable(v) end
-    return tostring(v)
-end
-
-local function _callerLoc(level)
-    local info = debug.getinfo(level, "Sl")
-    if not info then return "?" end
-    local src = info.short_src:gsub("^@@?[^/\\]+[/\\]", "")
-    return src .. ":" .. (info.currentline or "?")
-end
-
-local function _parts(...)
-    local t = {}
-    for i = 1, select("#", ...) do t[i] = _serialize(select(i, ...)) end
-    return table.concat(t, " ")
-end
-
----@param ... any
-function Utils.mbtDebugger(...)
-    if not MBT.Debug then return end
-    print(("^2[%s]^0 ^3%s^0 \xc2\xbb %s^0"):format(_resName, _callerLoc(3), _parts(...)))
-end
-
----@param ... any
-function Utils.mbtWarn(...)
-    print(("^2[%s]^0 ^3[WARN] %s^0 \xc2\xbb %s^0"):format(_resName, _callerLoc(3), _parts(...)))
-end
-
----@param ... any
-function Utils.mbtError(...)
-    print(("^2[%s]^0 ^1[ERROR] %s^0 \xc2\xbb %s^0"):format(_resName, _callerLoc(3), _parts(...)))
-end
+-- Logging — the canonical leveled logger lives in modules/utils/logger.lua
+-- (shared_script, loaded before this). Alias it onto Utils so the existing
+-- call sites keep working; new code can use Utils.Info/Warn/Error directly.
+Utils.Debug = MBTLog.Debug
+Utils.Info = MBTLog.Info
+Utils.Warn = MBTLog.Warn
+Utils.Error = MBTLog.Error
+Utils.mbtDebugger = MBTLog.Debug -- back-compat alias
+Utils.mbtWarn = MBTLog.Warn      -- back-compat alias
+Utils.mbtError = MBTLog.Error    -- back-compat alias
 
 ---@param animdict string
 ---@return boolean

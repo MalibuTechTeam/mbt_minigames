@@ -1,4 +1,4 @@
-MBT = {}
+MBT = MBT or {}
 
 MBT.Debug = false
 MBT.DefaultDifficulty = "Easy"

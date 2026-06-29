@@ -8,6 +8,7 @@ version      '2.0.0'
 description 'A collection of mini-games integrated into the Malibù Tech\'s scripts'
 
 shared_scripts {
+	'modules/utils/logger.lua',
 	'modules/module.lua',
 	'config.lua'
 }
