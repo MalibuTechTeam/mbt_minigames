@@ -182,6 +182,13 @@ Enable with `MBT.Debug = true` in `config.lua`:
 
 ---
 
+## Links
+
+- 📖 **Documentation:** [malibutechteam.com/docs](https://malibutechteam.com/docs/mbt-minigames/overview)
+- 📦 **MBT Minigames on MalibuTech:** [malibutechteam.com](https://malibutechteam.com/scripts/5863335)
+- 💬 **Support & updates:** [MalibuTech Discord](https://discord.gg/6scYba9AMy)
+
+---
 ## License
 
 This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
