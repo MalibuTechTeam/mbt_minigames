@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "minigames-nui",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "web",
+      "port": 5173
+    },
+    {
+      "name": "minigames-nui-dist",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "preview", "--port", "4173"],
+      "cwd": "web",
+      "port": 4173
+    }
+  ]
+}

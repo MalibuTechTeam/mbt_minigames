@@ -1,0 +1,11 @@
+schema_version: 1
+product_id: mbt-minigames
+kind: fivem-script
+owner: malibutech
+repository: MalibuTechTeam/mbt_minigames
+runtime_resource_name: mbt_minigames
+commercial_model: free
+store_id: "5863335"
+documentation_slug: mbt-minigames
+display_name: MBT Minigames
+lifecycle: in-development

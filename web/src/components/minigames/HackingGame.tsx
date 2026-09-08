@@ -8,11 +8,37 @@ import LaptopFrame from "./LaptopFrame";
 import "./HackingGame.css";
 
 const HEX = "0123456789ABCDEF";
+const GRID_SIZE = 64;
 const genHexPair = () =>
   HEX[Math.floor(Math.random() * 16)] + HEX[Math.floor(Math.random() * 16)];
-const buildGrid = () => Array.from({ length: 64 }, genHexPair);
-const buildWanted = (grid: string[], length: number) =>
-  Array.from({ length }, () => grid[Math.floor(Math.random() * 64)]);
+
+// Two guarantees, the same ones the 2023 vanilla grid had in fillGrid():
+// the target values are distinct from each other, and no filler ever repeats
+// one. Without them 64 draws out of 256 collide in ~every run, and a twin cell
+// both lights up with its sibling and counts as a correct click.
+const buildWanted = (length: number) => {
+  const wanted = new Set<string>();
+  while (wanted.size < length) wanted.add(genHexPair());
+  return [...wanted];
+};
+
+const buildGrid = (wanted: string[]) => {
+  const grid = Array.from({ length: GRID_SIZE }, () => {
+    let filler = genHexPair();
+    while (wanted.includes(filler)) filler = genHexPair();
+    return filler;
+  });
+  // Each target lands in a cell of its own.
+  const freeSlots = Array.from({ length: GRID_SIZE }, (_, i) => i);
+  for (const value of wanted) {
+    const [slot] = freeSlots.splice(
+      Math.floor(Math.random() * freeSlots.length),
+      1,
+    );
+    grid[slot] = value;
+  }
+  return grid;
+};
 
 const BootSequence: React.FC<{
   onComplete: () => void;
@@ -84,14 +110,15 @@ const HackingGame: React.FC = () => {
     );
   const hackingLocale = useMemo(() => locale || {}, [locale]);
   const maxMistakes = gameParams.maxMistakes || 4;
-  const sequenceLength = gameParams.sequenceLength || 5;
+  // Clamped: a consumer passing a length above the grid size would spin
+  // buildWanted forever looking for values it cannot place.
+  const sequenceLength = Math.min(gameParams.sequenceLength || 5, GRID_SIZE);
   const [timeLeft, setTimeLeft] = useState(timeLimit || 35);
   // Grid + target sequence are derived once from props — lazy-init, no effect.
-  const [gridItems] = useState<string[]>(buildGrid);
-  const [wantedItems] = useState<string[]>(() =>
-    buildWanted(gridItems, sequenceLength),
-  );
-  const [foundItems, setFoundItems] = useState<string[]>([]);
+  const [wantedItems] = useState<string[]>(() => buildWanted(sequenceLength));
+  const [gridItems] = useState<string[]>(() => buildGrid(wantedItems));
+  // Tracked by cell index, not by value: only the clicked cell lights up.
+  const [foundIndexes, setFoundIndexes] = useState<number[]>([]);
   const [isBooting, setIsBooting] = useState(true);
   const [status, setStatus] = useState<"playing" | "won" | "lost">("playing");
   const [wrongIndex, setWrongIndex] = useState<number | null>(null);
@@ -165,13 +192,13 @@ const HackingGame: React.FC = () => {
   const handleItemClick = (item: string, index: number) => {
     if (status !== "playing" || isBooting) return;
 
-    if (item === wantedItems[foundItems.length]) {
+    if (item === wantedItems[foundIndexes.length]) {
       if (clickSound.current) {
         clickSound.current.currentTime = 0;
         clickSound.current.play().catch(() => {});
       }
-      const newFound = [...foundItems, item];
-      setFoundItems(newFound);
+      const newFound = [...foundIndexes, index];
+      setFoundIndexes(newFound);
       if (newFound.length === wantedItems.length) {
         handleEnd(true);
       }
@@ -280,7 +307,7 @@ const HackingGame: React.FC = () => {
                     {gridItems.map((item, idx) => (
                       <motion.div
                         key={idx}
-                        className={`hacking-grid-item ${foundItems.includes(item) ? "selected" : ""} ${idx === wrongIndex ? "wrong" : ""}`}
+                        className={`hacking-grid-item ${foundIndexes.includes(idx) ? "selected" : ""} ${idx === wrongIndex ? "wrong" : ""}`}
                         onClick={() => handleItemClick(item, idx)}
                         onMouseEnter={() => {
                           if (hoverSound.current) {
@@ -302,7 +329,7 @@ const HackingGame: React.FC = () => {
                       {wantedItems.map((item, idx) => (
                         <div
                           key={idx}
-                          className={`sequence-item ${idx < foundItems.length ? "found" : idx === foundItems.length ? "active" : "pending"}`}
+                          className={`sequence-item ${idx < foundIndexes.length ? "found" : idx === foundIndexes.length ? "active" : "pending"}`}
                         >
                           {item}
                         </div>

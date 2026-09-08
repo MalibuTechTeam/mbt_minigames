@@ -5,102 +5,20 @@ on:
     tags:
       - "v*.*.*"
 
+# The recipe lives in MalibuTechTeam/mbt_template, which is public so that the
+# private resources can call it too -- MalibuTechTeam is a user account, not an
+# organisation, and a reusable workflow in a private repo would not be callable.
+#
+# It used to be 130 lines here, copied into thirteen resources and drifted: four
+# generations of actions/checkout, and six workflows running with
+# `permissions: write-all` to zip a folder. This one asks for contents: write.
 jobs:
-  create-release:
-    name: Build and Create Tagged release
-    runs-on: ubuntu-latest
-    permissions: write-all
-
-    steps:
-      - name: Install archive tools
-        run: sudo apt-get install -y zip
-
-      - name: Checkout source code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.13
-
-      - name: Install & Build Web UI
-        working-directory: ./web
-        run: |
-          bun install --frozen-lockfile
-          bun run build
-
-      - name: Get variables & Tag Message
-        id: get_vars
-        run: |
-          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-          echo "DATE=$(date +'%d-%m-%Y')" >> $GITHUB_ENV
-
-          TAG_MSG=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
-
-          if [ -z "$TAG_MSG" ]; then
-            TAG_MSG="${{ github.event.head_commit.message }}"
-          fi
-
-          {
-            echo 'CHANGELOG<<EOF'
-            echo "$TAG_MSG"
-            echo 'EOF'
-          } >> $GITHUB_ENV
-
-          if [[ "${{ github.ref_name }}" == *"-"* ]]; then
-            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
-          else
-            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
-          fi
-
-      - name: Checkout branch for manifest bump
-        run: |
-          BRANCH=$(git branch -r --contains HEAD | grep -v HEAD | sed 's|origin/||' | xargs | awk '{print $1}')
-          git checkout $BRANCH
-
-      - name: Bump manifest version
-        run: node .github/actions/bump-manifest-version.js
-        env:
-          TGT_RELEASE_VERSION: ${{ github.ref_name }}
-
-      - name: Push manifest change
-        uses: EndBug/add-and-commit@v9
-        with:
-          add: fxmanifest.lua
-          push: true
-          author_name: Manifest Bumper
-          author_email: 41898282+github-actions[bot]@users.noreply.github.com
-          message: "chore: bump manifest version to ${{ github.ref_name }}"
-
-      - name: Update tag ref
-        uses: EndBug/latest-tag@latest
-        with:
-          tag-name: ${{ github.ref_name }}
-
-      - name: Bundle files
-        run: |
-          mkdir -p ./temp/mbt_minigames
-
-          cp ./{README.md,config.lua,fxmanifest.lua} ./temp/mbt_minigames/
-
-          cp -r ./{core,modules} ./temp/mbt_minigames/
-
-          mkdir -p ./temp/mbt_minigames/web
-          cp -r ./web/dist ./temp/mbt_minigames/web/
-
-          cd ./temp && zip -r ../mbt_minigames.zip ./mbt_minigames
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: mbt_minigames.zip
-          name: ${{ github.ref_name }}
-          body: ${{ env.CHANGELOG }}
-          prerelease: ${{ env.IS_PRERELEASE }}
+  release:
+    uses: MalibuTechTeam/mbt_template/.github/workflows/mbt-release.yml@main
+    with:
+      resource: mbt_minigames
+      files: "README.md config.lua fxmanifest.lua"
+      dirs: "core modules"
+      web: true
+    permissions:
+      contents: write
